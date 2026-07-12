@@ -1,56 +1,127 @@
-# Unified Document Intelligence API — Aggregated Specification
+# Unified Document Intelligence API Specification
 
-> **Scope.** This document aggregates the capabilities, concepts, APIs, and use cases of **eleven** document-intelligence / document-RAG / document-KG systems surveyed in this directory (`datalab`, `docetl`, `docling`, `google`, `ibm`, `knowledgegraph`, `lighton`, `mistral`, `mixedbread`, `openai`, `weaviate`). It performs the **union** of every capability described, orders them along an **exhaustive end-to-end processing pipeline**, flags where **different names are used for the same concept**, and flags where **different approaches can be chosen for the same step**. The final part is a **detailed specification of a super-complete API** that would encompass all the features of the individual systems, written for the end user.
->
-> Each source system is referenced by its short name in parentheses, e.g. `(weaviate)`, `(datalab)`, `(docling)`.
-
----
-
-## Table of Contents
-
-1. [Introduction & Concepts](#1-introduction--concepts)
-2. [The Unified Processing Pipeline (Overview)](#2-the-unified-processing-pipeline-overview)
-3. [Detailed Pipeline Stages](#3-detailed-pipeline-stages)
-   - 3.1 File Upload & Ingestion
-   - 3.2 Document Parsing, OCR & Layout Analysis
-   - 3.3 Document Segmentation / Boundary Detection
-   - 3.4 Chunking / Splitting
-   - 3.5 Chunk Enrichment & Contextualization
-   - 3.6 Data Extraction (Fields, Tables, Key-Value Pairs, Annotations)
-   - 3.7 Classification & Categorization (Taxonomies, Facets, Tags)
-   - 3.8 Entity Detection, Resolution, Deduplication & Linking
-   - 3.9 Clustering
-   - 3.10 Embedding / Vectorization
-   - 3.11 Indexing & Storage
-   - 3.12 Search (Lexical, Vector, Hybrid, Agentic)
-   - 3.13 Filtering, Facets & Metadata Scoping
-   - 3.14 Reranking
-   - 3.15 Query Rewriting & Preprocessing
-   - 3.16 Caching
-   - 3.17 Answer Generation / RAG / QA
-   - 3.18 Knowledge Graph Building
-   - 3.19 Aggregations, Grouped Search & Analytics
-   - 3.20 Document Transformation & Round-trip (Generation, Form Filling, Track Changes)
-   - 3.21 Orchestration, Pipelines & Workflows
-   - 3.22 Evaluation, Quality Assurance & Optimization
-   - 3.23 Provenance, Citations & Source Tracking
-   - 3.24 Visualization
-   - 3.25 Multi-tenancy, Security, Residency & Administration
-4. [Naming Variant Cross-Reference Table](#4-naming-variant-cross-reference-table)
-5. [Alternative-Approaches Cross-Reference Table](#5-alternative-approaches-cross-reference-table)
-6. [Unified API Specification](#6-unified-api-specification)
-7. [End-to-End Reference Flows](#7-end-to-end-reference-flows)
-8. [Coverage Matrix](#8-coverage-matrix)
+> **Aggregated from:** datalab, docetl, docling, google, ibm, knowledgegraph, lighton, mistral, mixedbread, openai, and weaviate
+> **Purpose:** A single, exhaustive specification that encompasses every document-intelligence capability, concept, parameter, and processing step described across the eleven platform studies in `./platform-studies/documents/`.
 
 ---
 
-## 1. Introduction & Concepts
+## How to Read This Document
 
-### 1.1 What is "Document Intelligence"?
+This document is written for end users — developers, product managers, and architects who want to understand the **full landscape** of document-intelligence capabilities before choosing a provider or building a system. It is organized as follows:
+
+1. **Part I — Concepts & Vocabulary** — An approachable introduction to every concept you will encounter, with plain-language explanations and a glossary that maps the many different names providers use for the *same* idea.
+2. **Part II — The Exhaustive Processing Pipeline** — Every document-intelligence capability ordered into a single exhaustive end-to-end pipeline, organized into **modular phases**. Each stage lists the alternative approaches available and the synonyms used by each platform.
+3. **Part III — The Unified API Specification** — A detailed, provider-agnostic API reference that describes every endpoint, parameter, data structure, and response format needed to implement a "super complete" document-intelligence platform.
+4. **Part IV — Cross-Reference & Coverage** — Naming-variant and alternative-approach cross-reference tables, end-to-end reference flows, and a capability coverage matrix.
+
+Each source system is referenced by its short name in parentheses, e.g. `(weaviate)`, `(datalab)`, `(docling)`.
+
+---
+
+# Part I — Concepts & Vocabulary
+
+## 1. What Is Document Intelligence?
 
 Document Intelligence is the set of techniques that turn **unstructured or semi-structured documents** (PDFs, images, Office files, HTML, email, spreadsheets, audio, video, code, XML schemas) into **structured, machine-readable, searchable, and answerable** data. It spans the entire journey from a raw file on disk to a grounded answer in a chatbot, covering ingestion, parsing, layout understanding, chunking, enrichment, extraction, classification, entity resolution, embedding, indexing, retrieval, reranking, generation, knowledge-graph construction, and evaluation.
 
-### 1.2 The Two Archetypes
+## 2. Core Concepts (Provider-Agnostic)
+
+### 2.1 The Document Lifecycle
+A document moves through three broad time horizons on the platform:
+- **Index time** (write path) — the document is uploaded, parsed, chunked, enriched, embedded, and stored so it can be searched later. Most of the pipeline runs here.
+- **Query time** (read path) — a user issues a query; the system rewrites it, searches the index, filters, reranks, and generates an answer.
+- **Cross-cutting** — concerns that touch both paths: orchestration, evaluation, provenance, tenancy, security, visualization.
+
+### 2.2 Document / File / Data Object
+The unit of input. Variants: *File* `(datalab, openai, mistral, mixedbread)`, *Data Object* `(weaviate)`, *Document* `(google, docling)`, *Item* / *row* `(docetl)`, *Analyzer* (a processing job) `(ibm)`.
+
+### 2.3 Workspace / Store / Collection
+A named container holding documents and their index. Variants: *Workspace* `(lighton)`, *Store* / *search index* `(mixedbread)`, *Vector Store* `(openai)`, *FileSearchStore* `(google)`, *Collection* / *schema* / *class* `(weaviate)`, *Project* `(ibm)`, *Dataset* / *Frame* `(docetl)`.
+
+### 2.4 Chunk
+A retrievable text/media segment produced from a document. Variants: *Chunk* `(weaviate, mixedbread, mistral, openai)`, *DocumentChunk* `(mistral)`, *block* `(datalab, docling, ibm)`, *content item* `(docling)`.
+
+### 2.5 Embedding / Vector
+A numeric array representing semantic content. Variants: *Vector* `(weaviate, openai)`, *embedding* `(google, mistral, mixedbread, lighton, docetl)`.
+
+### 2.6 Vectorizer / Embedder
+The component that produces vectors. Variants: *Vectorizer module* `(weaviate)`, *Embedder* `(mistral)`, *Embedding model* `(google, openai)`.
+
+### 2.7 Schema / Template / Ontology
+A definition of the structure to extract or enforce. Variants: *extraction schema* / *page_schema* / *schema_id* `(datalab)`, *Pydantic template* `(knowledgegraph)`, *ontology* / *KeyClass* `(ibm)`, *JSON Schema* `(google, lighton, mixedbread, mistral)`, *output schema* `(docetl)`, *collection schema* `(weaviate)`.
+
+### 2.8 Citation / Provenance
+Linking outputs back to source document locations. Variants: *file_citation* `(google, openai)`, *citations* / *block IDs* `(datalab)`, *provenance* / *ProvenanceLedger* `(knowledgegraph, datalab)`, *source attribution* `(lighton, mixedbread)`.
+
+### 2.9 RAG / Generative search / Ask / QA
+Retrieval + LLM generation. Variants: *Generative search* `(weaviate)`, *Ask* `(lighton)`, *Question Answering* `(mixedbread)`, *File Search tool* `(openai)`, *Document QnA* `(mistral)`, *File Search* `(google)`.
+
+### 2.10 Reranking
+Second-stage reordering of retrieved results with a more expensive model. Variants: *Rerank* `(weaviate)`, *Reranker* `(mistral)`, *relevance_scoring* `(lighton)`, *rerank* `(mixedbread)`. Not present in `(openai, google)` as a separate API.
+
+### 2.11 Query Rewriting
+Improving a user query *before* retrieval (stripping conversational filler, generating sub-queries). This is a **pre-search** step — it logically precedes search and reranking.
+
+### 2.12 Pipeline / Workflow / Operator chain
+Orchestration of processing steps. Variants: *Pipeline* `(datalab, mistral, docetl)`, *Workflow (Temporal)* `(datalab)`, *operator chain* / *Frame* `(docetl)`, *run_pipeline* `(knowledgegraph)`, *ingestion pipeline* `(mixedbread, lighton)`.
+
+### 2.13 Checkpoint
+A stored intermediate parse state reusable by downstream steps — parse once, run many extractions without re-parsing. `(datalab)` unique.
+
+### 2.14 Facet / Content-type / Tag
+Classification metadata used to scope search. Variants: *Facet* / *content-type* `(lighton)`, *tag* `(lighton)`, *attribute* `(openai, lighton, weaviate)`, *custom_metadata* `(google, mixedbread)`.
+
+### 2.15 Tenancy / Isolation
+Multi-tenant data separation. Variants: *Workspace* `(lighton)`, *Tenant* `(weaviate)`, *Organization* `(mixedbread)`, *team context* `(datalab)`.
+
+### 2.16 Quantization / Compression
+Reducing vector storage. `(weaviate)` unique (PQ/BQ/SQ/RQ).
+
+### 2.17 Billing Units
+- **Per page** — conversion, extraction priced per 1K pages `(datalab, ibm)`.
+- **Per token** — embedding, generation usage `(openai, mixedbread, lighton)`.
+- **Per request / per file** — ingestion counts `(google, mixedbread)`.
+- **Storage** — free in some `(google)`, per-index in others `(weaviate, openai)`.
+- **Surcharges** — add-on bbox extraction `$0.30/1K pages` `(datalab)`; EU residency premium `(datalab)`.
+
+## 3. Cross-Provider Synonym Glossary
+
+| Concept | Variant names (system) |
+|---|---|
+| Document container | Workspace (lighton), Store / search index (mixedbread), Vector Store (openai), FileSearchStore (google), Collection / schema / class (weaviate), Project (ibm), Dataset / Frame (docetl) |
+| Document / input unit | File (datalab, openai, mistral, mixedbread), Data Object (weaviate), Document (google, docling), Item / row (docetl), Analyzer (ibm) |
+| Chunk | Chunk (weaviate, mixedbread, mistral, openai), DocumentChunk (mistral), block (datalab, docling, ibm), content item (docling) |
+| Embedding | Vector (weaviate, openai), embedding (google, mistral, mixedbread, lighton, docetl) |
+| Embedding component | Vectorizer module (weaviate), Embedder (mistral), Embedding model (google, openai) |
+| Schema | page_schema / schema_id (datalab), Pydantic template (knowledgegraph), ontology / KeyClass (ibm), JSON Schema (google, lighton, mixedbread, mistral), output schema (docetl), collection schema (weaviate) |
+| Citation / provenance | file_citation (google, openai), citations / block IDs (datalab), provenance / ProvenanceLedger (knowledgegraph), source attribution (lighton, mixedbread) |
+| RAG / QA | Generative search (weaviate), Ask (lighton), Question Answering (mixedbread), File Search tool (openai), Document QnA (mistral), File Search (google) |
+| Reranking | Rerank (weaviate), Reranker (mistral), relevance_scoring (lighton), rerank (mixedbread) |
+| Query rewriting | rewrite_query (openai, mixedbread), LLMQueryRewriter / LLMQueryExtension (mistral) |
+| Pipeline / orchestration | Pipeline (datalab, mistral, docetl), Workflow / Temporal (datalab), operator chain / Frame (docetl), run_pipeline (knowledgegraph), ingestion pipeline (mixedbread, lighton) |
+| Classification metadata | Facet / content-type (lighton), tag (lighton), attribute (openai, lighton, weaviate), custom_metadata (google, mixedbread) |
+| Tenancy / isolation | Workspace (lighton), Tenant (weaviate), Organization (mixedbread), team context (datalab) |
+| Quantization / compression | Quantization (weaviate) — PQ/BQ/SQ/RQ |
+| Segmentation | Document Segmentation (datalab), DS/SHW (ibm) |
+| Entity dedup | Resolve (docetl), entity standardization (knowledgegraph), entity resolution / dense dedupe (knowledgegraph), link_resolve (docetl) |
+| Filter | where clause / pre-filter (weaviate), attribute_filter / filters (openai, mixedbread), metadata_filter (google), content_type[]/attribute[] (lighton) |
+| Hybrid fusion | RELATIVE_SCORE / RANKED (weaviate), RRF (openai, mistral), hybrid (lighton) |
+| Expiration | expires_after (openai, mixedbread), TTL (weaviate), result retention (datalab), raw file 48h (google) |
+| Chunking | Chunking (openai, google, docling, mistral), Split (docetl), TextSplitter (mistral), DocumentChunker (knowledgegraph) |
+
+## 4. Input Formats (Union)
+
+The union of accepted input formats across all systems. No single system supports all of these; the unified API accepts all and routes to format-specific backends.
+
+- **Documents:** PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS, ODT, ODP, ODS, ODF, RTF, CSV, TSV, HTML, HTM, Markdown, TXT, AsciiDoc, LaTeX, Box Notes, XML (JATS, USPTO, XBRL), Email (EML, MSG), NUMBERS, HWP/HWPX.
+- **Images:** PNG, JPG/JPEG, WebP, AVIF, TIFF.
+- **Audio:** MP3, WAV, M4A, AAC, OGG, FLAC, WebM Audio.
+- **Video:** MP4, AVI, MOV, QuickTime, WebM, OGG Video.
+- **Code:** Python, Java, Go, Rust, Swift, Kotlin, Scala, TypeScript, JavaScript, PHP, C, C++, C#, Ruby, Shell, PowerShell, CSS, diff, R Markdown, Graphviz, YAML, JSON.
+- **Structured:** JSON, JSONL, Parquet, CSV, MXJSON/MXJSONL (pre-chunked format `(mixedbread)`), DocLang / `.dclx` `(docling)`, Docling JSON `(docling)`.
+- **Other:** ZIP archives, WebVTT (timed text).
+
+## 5. The Two Archetypes
 
 The surveyed systems cluster into (often overlapping) archetypes:
 
@@ -63,125 +134,115 @@ The surveyed systems cluster into (often overlapping) archetypes:
 | **Knowledge-Graph Builder** | Document → entities + relationships → graph (NetworkX / Neo4j) with provenance. | knowledgegraph (Docling-Graph, AI-Knowledge-Graph, Neo4j) |
 | **Enterprise Capture / Extraction** | Classification + OCR + KVP/table extraction with ontology, validation, verification. | ibm (DPE) |
 
-A **super-complete** system would encompass all of these archetypes in one coherent API.
-
-### 1.3 Core Concepts Glossary (Union)
-
-These are the concepts you need to understand to navigate the rest of this document. Where systems use different names for the same concept, the variants are listed.
-
-- **Document / File / Data Object** — the unit of input. Variants: *File* `(datalab, openai, mistral, mixedbread)`, *Data Object* `(weaviate)`, *Document* `(google, docling)`, *Item* / *row* `(docetl)`, *Analyzer* (a processing job) `(ibm)`.
-- **Workspace / Store / Collection / Index / Project** — a named container holding documents and their index. Variants: *Workspace* `(lighton)`, *Store* / *search index* `(mixedbread)`, *Vector Store* `(openai)`, *FileSearchStore* `(google)`, *Collection* / *schema* / *class* `(weaviate)`, *Project* `(ibm)`, *Dataset* / *Frame* `(docetl)`.
-- **Chunk** — a retrievable text/media segment produced from a document. Variants: *Chunk* `(weaviate, mixedbread, mistral, openai)`, *DocumentChunk* `(mistral)`, *block* `(datalab, docling, ibm)`, *content item* `(docling)`.
-- **Embedding / Vector** — a numeric array representing semantic content. Variants: *Vector* `(weaviate, openai)`, *embedding* `(google, mistral, mixedbread, lighton, docetl)`.
-- **Vectorizer / Embedder / Embedding model** — the component that produces vectors. Variants: *Vectorizer module* `(weaviate)`, *Embedder* `(mistral)`, *Embedding model* `(google, openai)`.
-- **Schema / Template / Ontology** — a definition of the structure to extract or enforce. Variants: *extraction schema* / *page_schema* / *schema_id* `(datalab)`, *Pydantic template* `(knowledgegraph)`, *ontology* / *KeyClass* `(ibm)`, *JSON Schema* `(google, lighton, mixedbread, mistral)`, *output schema* `(docetl)`, *collection schema* `(weaviate)`.
-- **Citation / Provenance / Source tracking** — linking outputs back to source locations. Variants: *file_citation* `(google, openai)`, *citations* / *block IDs* `(datalab)`, *provenance* / *ProvenanceLedger* `(knowledgegraph, datalab)`, *source attribution* `(lighton, mixedbread)`.
-- **RAG / Generative search / Ask / QA** — retrieval + LLM generation. Variants: *Generative search* `(weaviate)`, *Ask* `(lighton)`, *Question Answering* `(mixedbread)`, *File Search tool* `(openai)`, *Document QnA* `(mistral)`, *File Search* `(google)`.
-- **Reranking / Relevance scoring** — second-stage reordering of retrieved results. Variants: *Rerank* `(weaviate)`, *Reranker* `(mistral)`, *relevance_scoring* `(lighton)`, *rerank* `(mixedbread)`. Not present in `(openai, google)`.
-- **Pipeline / Workflow / Operator chain** — orchestration of processing steps. Variants: *Pipeline* `(datalab, mistral, docetl)`, *Workflow (Temporal)* `(datalab)`, *operator chain* / *Frame* `(docetl)`, *run_pipeline* `(knowledgegraph)`, *ingestion pipeline* `(mixedbread, lighton)`.
-- **Checkpoint** — a stored intermediate parse state reusable by downstream steps. `(datalab)` unique.
-- **Facet / Content-type / Tag** — classification metadata. Variants: *Facet* / *content-type* `(lighton)`, *tag* `(lighton)`, *attribute* `(openai, lighton, weaviate)`, *custom_metadata* `(google, mixedbread)`.
-- **Tenancy / Isolation** — multi-tenant data separation. Variants: *Workspace* `(lighton)`, *Tenant* `(weaviate)`, *Organization* `(mixedbread)`, *team context* `(datalab)`.
-- **Quantization / Compression** — reducing vector storage. `(weaviate)` unique (PQ/BQ/SQ/RQ).
-
-### 1.4 Input Formats (Union)
-
-The union of accepted input formats across all systems:
-
-- **Documents:** PDF, DOCX, DOC, PPTX, PPT, XLSX, XLS, ODT, ODP, ODS, ODF, RTF, CSV, TSV, HTML, HTM, Markdown, TXT, AsciiDoc, LaTeX, Box Notes, XML (JATS, USPTO, XBRL), Email (EML, MSG), NUMBERS, HWP/HWPX.
-- **Images:** PNG, JPG/JPEG, WebP, AVIF, TIFF.
-- **Audio:** MP3, WAV, M4A, AAC, OGG, FLAC, WebM Audio.
-- **Video:** MP4, AVI, MOV, QuickTime, WebM, OGG Video.
-- **Code:** Python, Java, Go, Rust, Swift, Kotlin, Scala, TypeScript, JavaScript, PHP, C, C++, C#, Ruby, Shell, PowerShell, CSS, diff, R Markdown, Graphviz, YAML, JSON.
-- **Structured:** JSON, JSONL, Parquet, CSV, MXJSON/MXJSONL (pre-chunked format `(mixedbread)`), DocLang / `.dclx` `(docling)`, Docling JSON `(docling)`.
-- **Other:** ZIP archives, WebVTT (timed text).
-
-> **Note on format coverage:** No single system supports all of these. The super-complete API would accept all and route to format-specific backends.
+A **super-complete** system encompasses all of these archetypes in one coherent API.
 
 ---
 
-## 2. The Unified Processing Pipeline (Overview)
+# Part II — The Exhaustive Processing Pipeline
 
-The exhaustive pipeline below is ordered from raw input to final answer and beyond. Every stage is **optional** and stages can be combined, reordered, or bypassed depending on the system and use case.
+The pipeline is organized into **modular phases**. Phases A–F form the linear end-to-end flow from raw input to final answer/output. Phase G groups cross-cutting concerns that wrap or span the whole pipeline. Every stage is **optional** — stages can be combined, reordered, or bypassed depending on the use case.
 
 ```
-[1] File Upload & Ingestion
-        │
-        ▼
-[2] Document Parsing / OCR / Layout Analysis
-        │
-        ▼
-[3] Document Segmentation / Boundary Detection   (optional; multi-doc PDFs)
-        │
-        ▼
-[4] Chunking / Splitting
-        │
-        ▼
-[5] Chunk Enrichment & Contextualization          (summaries, context windows, metadata)
-        │
-        ▼
-[6] Data Extraction (fields, tables, KVPs, annotations)
-        │                                              │
-        ▼                                              ▼
-[7] Classification / Categorization         [8] Entity Detection / Resolution / Linking
-        │                                              │
-        ▼                                              ▼
-[9] Clustering                                    [18] Knowledge Graph Building
-        │                                              │
-        ▼                                              ▼
-[10] Embedding / Vectorization  ─────────────────────►
-        │
-        ▼
-[11] Indexing & Storage  (vector store, inverted index, graph store)
-        │
-        ▼
-   ┌──── Query Time ────────────────────────────────────┐
-   │ [12] Search (lexical / vector / hybrid / agentic)  │
-   │ [13] Filtering, Facets & Metadata Scoping           │
-   │ [14] Reranking                                       │
-   │ [15] Query Rewriting & Preprocessing                 │
-   │ [16] Caching                                         │
-   │ [17] Answer Generation / RAG / QA                    │
-   └──────────────────────────────────────────────────────┘
-        │
-        ▼
-[19] Aggregations, Grouped Search & Analytics
-        │
-        ▼
-[20] Document Transformation & Round-trip (DOCX generation, form filling, track changes)
-        │
-        ▼
-[21] Orchestration / Pipelines / Workflows  (wraps the whole pipeline)
-[22] Evaluation / QA / Optimization          (wraps the whole pipeline)
-[23] Provenance / Citations                  (cross-cutting)
-[24] Visualization                           (cross-cutting)
-[25] Multi-tenancy / Security / Administration (cross-cutting)
+PHASE A — Ingestion & Storage (index time)
+  A1 Authentication & Access Control
+  A2 Container / Workspace Management
+  A3 File Upload & Ingestion
+  A4 Document Segmentation / Boundary Detection
+            │
+            ▼
+PHASE B — Document Understanding (parse + extract; checkpoint-reusable)
+  B1 Document Parsing, OCR & Layout Analysis
+  B2 Data Extraction (fields, tables, KVPs, annotations)
+  B3 Classification & Categorization
+            │
+            ▼
+PHASE C — Chunking & Enrichment (prepare for indexing)
+  C1 Chunking / Splitting
+  C2 Chunk Enrichment & Contextualization
+            │
+            ▼
+PHASE D — Embedding, Indexing & Graph (build the retrievable store)
+  D1 Embedding / Vectorization
+  D2 Indexing & Storage
+  D3 Entity Detection, Resolution, Deduplication & Linking
+  D4 Clustering
+  D5 Knowledge Graph Building
+            │
+   ┌────────┴───────── query-time boundary ─────────┐
+   ▼                                                 │
+PHASE E — Query Time (read path, correct order)       │
+  E1 Query Rewriting & Preprocessing   ← runs BEFORE search
+  E2 Search (lexical / vector / hybrid / agentic)
+  E3 Filtering, Facets & Metadata Scoping
+  E4 Reranking
+  E5 Caching
+  E6 Aggregations, Grouped Search & Analytics
+            │                                         │
+            ▼                                         │
+PHASE F — Generation & Output                         │
+  F1 Answer Generation / RAG / QA                     │
+  F2 Document Transformation & Round-trip             │
+            │                                         │
+            ▼                                         │
+PHASE G — Cross-Cutting Concerns (wrap the whole pipeline) │
+  G1 Orchestration, Pipelines & Workflows             │
+  G2 Evaluation, Quality Assurance & Optimization    │
+  G3 Provenance, Citations & Source Tracking          │
+  G4 Visualization                                    │
+  G5 Multi-tenancy, Security, Residency & Administration │
 ```
 
 ---
 
-## 3. Detailed Pipeline Stages
+## Phase A — Ingestion & Storage
 
-### 3.1 File Upload & Ingestion
+### A1 Authentication & Access Control
+
+**Purpose:** Authenticate requests and scope them to a tenant/team/organization.
+
+**Alternative approaches:**
+1. **API key (bearer token)** — `Authorization: Bearer <key>` or `X-API-Key` header. `(google, lighton, mixedbread, openai, weaviate, mistral, datalab)`
+2. **HTTP Basic + Bearer/Zen JWT** — `(ibm)`
+3. **OIDC tokens** — `(weaviate)`
+4. **Model provider keys via headers** — `X-OPENAI-API-KEY`, `X-COHERE-API-KEY`, etc. for self-hosted vectorizer/generator modules. `(weaviate)`
+5. **Scoped API keys with roles** — owner/editor/viewer, workspace-scoped. `(lighton)`
+
+---
+
+### A2 Container / Workspace Management
+
+**Purpose:** Create the named container that holds documents and their index.
+
+**Alternative approaches:**
+1. **Workspace with type + residency** — `shared`/`personal`, `processing_location: us/eu`, embedding model, chunking config, expiration. `(lighton, datalab)`
+2. **Vector store with expiration** — `expires_after: {anchor, days}`. `(openai, mixedbread)`
+3. **FileSearchStore with immutable embedding model** — `embedding_model` set at creation. `(google)`
+4. **Collection with schema + vectorizer config** — named vectors, distance metric, index type, per-property index flags. `(weaviate)`
+5. **Project with ontology** — doc types, KeyClasses, validators. `(ibm)`
+6. **Dataset / Frame** — lazy, immutable; Python API ↔ YAML. `(docetl)`
+
+---
+
+### A3 File Upload & Ingestion
 
 **Purpose:** Get raw documents into the system.
 
-**Naming variants for the container:** Workspace `(lighton)`, Store / search index `(mixedbread)`, Vector Store `(openai)`, FileSearchStore `(google)`, Collection `(weaviate)`, Project `(ibm)`, Dataset / Frame `(docetl)`, file storage `(datalab, mistral)`.
-
 **Alternative ingestion approaches (union):**
 
-1. **Direct multipart upload** — binary file in the request body. `(datalab, docling, ibm, lighton, mistral, mixedbread, openai)`
-2. **URL-based ingestion** — pass a public/internal URL; the platform fetches it. `(datalab, docling, google, lighton, mistral, mixedbread)`
-3. **Base64 inline** — file bytes encoded inline in JSON body. `(docling, google, mistral)`
-4. **Presigned-URL upload** — platform issues a presigned PUT URL; client uploads to object storage. `(datalab, mixedbread)`
-5. **Resumable / multipart upload** — two-step initiate-then-upload for large files. `(google, mixedbread)` — supports up to ~1 TB `(mixedbread)`.
-6. **Cloud-storage loaders** — S3, Azure Blob, GCS, Google Drive, SharePoint sync. `(mistral, lighton)`
-7. **Local filesystem / directory batch** — recursive directory reads. `(docling, docetl, mistral)`
-8. **In-memory / stream** — `DocumentStream`, `from_list`, `convert_string`. `(docling, docetl)`
-9. **Pre-chunked ingestion (MXJSON/MXJSONL)** — bypass parsing/chunking; provide chunks directly. `(mixedbread)`
-10. **Docling JSON round-trip** — re-ingest a prior Docling JSON to re-export without re-parsing. `(docling)`
-11. **`datalab://` file references** — stable URI for previously uploaded files. `(datalab)`
-12. **Object insertion (JSON)** — insert pre-parsed JSON objects directly into a vector DB. `(weaviate)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Direct multipart upload | Binary file in request body | datalab, docling, ibm, lighton, mistral, mixedbread, openai |
+| 2 | URL-based ingestion | Pass a public/internal URL; platform fetches it | datalab, docling, google, lighton, mistral, mixedbread |
+| 3 | Base64 inline | File bytes encoded inline in JSON body | docling, google, mistral |
+| 4 | Presigned-URL upload | Platform issues a presigned PUT URL; client uploads to object storage | datalab, mixedbread |
+| 5 | Resumable / multipart upload | Two-step initiate-then-upload for large files (~1 TB) | google, mixedbread |
+| 6 | Cloud-storage loaders | S3, Azure Blob, GCS, Google Drive, SharePoint sync | mistral, lighton |
+| 7 | Local filesystem / directory batch | Recursive directory reads | docling, docetl, mistral |
+| 8 | In-memory / stream | `DocumentStream`, `from_list`, `convert_string` | docling, docetl |
+| 9 | Pre-chunked ingestion (MXJSON/MXJSONL) | Bypass parsing/chunking; provide chunks directly | mixedbread |
+| 10 | Docling JSON round-trip | Re-ingest a prior Docling JSON to re-export without re-parsing | docling |
+| 11 | `datalab://` file references | Stable URI for previously uploaded files | datalab |
+| 12 | Object insertion (JSON) | Insert pre-parsed JSON objects directly into a vector DB | weaviate |
 
 **Key parameters (union):**
 - `file` / `file_url` / `document` / `base64_string` / `http_sources` — input source.
@@ -195,7 +256,7 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 - `purpose` — gates usage (e.g. `assistants` for vector stores). `(openai)`
 - `max_file_size` — limits (200 MB `(datalab)`, 250 MB `(ibm)`, 512 MB `(openai)`, 50 MB PDF `(google)`, ~1 TB multipart `(mixedbread)`, 100 MB async `(lighton, mistral)`).
 
-**Async processing pattern:** Upload returns a job/file ID + status; client polls or receives webhook until `completed`/`embedded`/`ACTIVE`. Status lifecycles:
+**Async processing pattern:** Upload returns a job/file ID + status; client polls or receives webhook until terminal state. Status lifecycles:
 - `pending → in_progress → completed | failed | cancelled` `(mixedbread, openai)`
 - `pending → pending_conversion → converting → parsing → embedding → embedded` `(lighton)`
 - `PROCESSING → ACTIVE | FAILED` `(google)`
@@ -203,13 +264,32 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 - `In Progress → Completed | Failed` `(ibm)`
 - `pending → dispatched → running → completed → failed → skipped` `(datalab pipelines)`
 
-**Webhooks:** `(datalab, ibm, docling-via-WS)` — alternative to polling.
+**Webhooks:** `(datalab, ibm, docling-via-WS)` — alternative to polling. Configure default in account settings or override per-request with `webhook_url`.
 
 **Batch ingestion:** Up to 500 files per batch `(openai)`; bulk operations `(mixedbread)`; `convert_all` `(docling)`; batch runs over collections `(datalab)`; concurrent `asyncio.gather` `(mistral)`.
 
+**Idempotent ingestion:** Deterministic UUID5 / `external_id` — re-ingesting overwrites, not duplicates. `(weaviate, mistral, lighton, mixedbread)`
+
 ---
 
-### 3.2 Document Parsing, OCR & Layout Analysis
+### A4 Document Segmentation / Boundary Detection
+
+**Purpose:** Split a multi-document PDF into logical sections (each segment = a separate document with page ranges). This is distinct from *chunking* — segmentation splits *documents within a file*; chunking splits *content within a document*.
+
+**Naming variants:** *Segmentation* / *Document Segmentation* `(datalab)`; *Document Segmentation* (`DS`/`SHW`) `(ibm)`.
+
+**Alternative approaches:**
+1. **Schema-guided segmentation** — provide `segmentation_schema` with segment names + descriptions. `(datalab)`
+2. **Automatic boundary detection** — `segmentation_strategy: document_boundary` for auto-detection. `(datalab)`
+3. **Page-structure segmentation** — header-based page structure segmentation. `(ibm)`
+
+**Output:** Segments with name, page ranges, confidence (`high`/`medium`/`low`). `(datalab)`
+
+---
+
+## Phase B — Document Understanding
+
+### B1 Document Parsing, OCR & Layout Analysis
 
 **Purpose:** Convert raw bytes into structured text + layout + tables + images + metadata.
 
@@ -217,16 +297,17 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 **Alternative parsing approaches (union):**
 
-1. **Multi-model pipeline (layout + OCR + table structure)** — separate models for layout (DocLayNet), OCR (Tesseract/Surya/RapidOCR), table structure (TableFormer). `(docling, datalab)`
-   - Modes: `fast` / `balanced` / `accurate` `(datalab)`; `table_mode: fast/accurate` `(docling)`.
-2. **Single end-to-end VLM** — one vision-language model (GraniteDocling 258M, or remote VLM API) replaces the entire chain. `(docling)`
-3. **Native multimodal vision** — the LLM "sees" PDF pages as images, preserving layout/charts/tables. `(google)` — `media_resolution: low/medium/high` (Gemini 3).
-4. **Managed automatic parsing** — platform-internal, not exposed (OCR + layout + transcription). `(lighton, mixedbread, openai)`
-5. **OCR API** — dedicated OCR endpoint returning markdown + images + tables + blocks. `(mistral)` — `mistral-ocr-latest` / `mistral-ocr-4-0`; 13 block types with bboxes in reading order; confidence scores at page/word granularity.
-6. **Word-level OCR with font metadata** — per-word coordinates, confidence, bold/italic/font. `(ibm)`
-7. **Format-specific backends** — subclassable per format (PDF, DOCX, HTML, image, audio). `(docling)`
-8. **Audio/video transcription (ASR)** — Whisper, Voxtral; diarization + timestamps. `(docling, mistral)` — output as WebVTT or text.
-9. **Legacy office conversion** — `.doc/.ppt/.hwp` → PDF via PyMuPDF Pro → OCR. `(mistral)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Multi-model pipeline | Separate models for layout (DocLayNet), OCR (Tesseract/Surya/RapidOCR), table structure (TableFormer). Modes: `fast`/`balanced`/`accurate` | docling, datalab |
+| 2 | Single end-to-end VLM | One vision-language model (GraniteDocling 258M, or remote VLM API) replaces the entire chain | docling |
+| 3 | Native multimodal vision | The LLM "sees" PDF pages as images; `media_resolution: low/medium/high` | google |
+| 4 | Managed automatic parsing | Platform-internal, not exposed (OCR + layout + transcription) | lighton, mixedbread, openai |
+| 5 | Dedicated OCR API | Endpoint returning markdown + images + tables + blocks; 13 block types with bboxes in reading order; confidence scores | mistral (`mistral-ocr-latest`/`4-0`) |
+| 6 | Word-level OCR with font metadata | Per-word coordinates, confidence, bold/italic/font | ibm |
+| 7 | Format-specific backends | Subclassable per format (PDF, DOCX, HTML, image, audio) | docling |
+| 8 | Audio/video transcription (ASR) | Whisper, Voxtral; diarization + timestamps; output as WebVTT or text | docling, mistral |
+| 9 | Legacy office conversion | `.doc/.ppt/.hwp` → PDF via PyMuPDF Pro → OCR | mistral |
 
 **Output representations (union):**
 - **Markdown** — per-page or full-document, with tables/lists/headings. `(datalab, docling, mistral, lighton)`
@@ -271,24 +352,64 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.3 Document Segmentation / Boundary Detection
+### B2 Data Extraction (Fields, Tables, KVPs, Annotations)
 
-**Purpose:** Split a multi-document PDF into logical sections (each segment = a separate document with page ranges).
+**Purpose:** Pull structured data (typed fields, tables, KV pairs) from documents using schemas or models.
 
-**Naming variants:** *Segmentation* / *Document Segmentation* `(datalab)`; *Document Segmentation* (`DS`/`SHW`) `(ibm)`.
+**Naming variants:** *Structured extraction* / *Extract* `(datalab, lighton, mistral, docetl)`, *Annotations* (BBox / Document) `(mistral)`, *KVP extraction* `(ibm)`, *structured output* `(google, openai)`, *Map operator* `(docetl)`.
 
-**Alternative approaches:**
-1. **Schema-guided segmentation** — provide `segmentation_schema` with segment names + descriptions. `(datalab)`
-2. **Automatic boundary detection** — `segmentation_strategy: document_boundary` for auto-detection. `(datalab)`
-3. **Page-structure segmentation** — header-based page structure segmentation. `(ibm)`
+**Alternative extraction approaches (union):**
 
-**Output:** Segments with name, page ranges, confidence (`high`/`medium`/`low`). `(datalab)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | JSON-schema-driven LLM extraction | Provide a JSON Schema / Pydantic / Zod model; LLM fills it. Modes: `turbo` (image-only, no citations), `fast` (citations + scores), `balanced` (verification + reasoning + citations) | datalab, google, lighton, mistral, mixedbread, docetl |
+| 2 | BBox annotation | Per-image classification/description via schema | mistral |
+| 3 | Document annotation | Document-level structured extraction via schema | mistral |
+| 4 | KVP extraction with ontology | Key + value with coordinates, confidence, KeyClass tagging, validators; three output tiers (basic/detailed/verbose) | ibm |
+| 5 | Table / line-item extraction | Recursive `ComplexKVPStructure` with nested rows/cells; nested tables | ibm |
+| 6 | Semantic normalization | Cleans/standardizes values (names, addresses) with `OriginalValue` preservation | ibm |
+| 7 | Verbatim text extraction | Pull source text without synthesis; line_number or regex strategy; lower token cost, no hallucination | docetl (`Extract`) |
+| 8 | Form filling | Fill PDF/image forms with field data; AcroForm + visual + image field detection; confidence threshold | datalab |
+| 9 | Schema auto-generation | Generate candidate extraction schemas (simple/moderate/complex) from a checkpoint | datalab |
+| 10 | Pydantic-template extraction | Schema-first Pydantic models define extraction schema AND graph structure; one-to-one or many-to-one | knowledgegraph |
+| 11 | Dense extraction | Two-phase skeleton-then-flesh extraction contract for large documents | knowledgegraph |
 
-> **Note:** This is distinct from *chunking* (which splits for embedding). Segmentation splits *documents within a file*; chunking splits *content within a document*.
+**Extraction modes (datalab):**
+- `turbo` — image-only, no citations, lowest price.
+- `fast` — per-field citations + `_score` (1–5) confidence with reasoning.
+- `balanced` — per-field independent verification (PASS/FAIL) + reasoning + citations.
+
+**Output quality signals (union):**
+- Per-field citations (block IDs traceable to source). `(datalab)`
+- Per-field verification status (`PASS`/`FAIL_UNRESOLVABLE`/`FAIL_FIX`/`FAIL_CITATIONS`/`ITEMS_MISSING`). `(datalab)`
+- Per-field confidence score (1–5) + reasoning. `(datalab)`
+- Per-field `KeyConfidence`/`ValueConfidence`/`KeyClassConfidence`. `(ibm)`
+- Extraction score average. `(datalab)`
+- Parse quality score (0–5). `(datalab)`
 
 ---
 
-### 3.4 Chunking / Splitting
+### B3 Classification & Categorization
+
+**Purpose:** Assign documents/chunks to categories, manage taxonomies, and use categories as search filters.
+
+**Alternative approaches (union):**
+1. **AI document classification** — assign to a known document class with confidence + alternate candidates. `(ibm)` — `Classification.DocumentClass` with `ClassConfidence`, `ClassMatch` (Low/Medium/High), `AlternateDocumentClass[]`.
+2. **Hierarchical content-type taxonomy (Facets)** — multi-tree taxonomy (max depth 4, `:`-path notation); typed, inheritable attributes per node; seed templates (finance, healthcare, legal, manufacturing, tech); file-level classify/unclassify/set_value/clear_value actions; sibling-conflict rules; filterable in search. `(lighton)`
+3. **Flat tags** — company-wide, non-hierarchical labels; `auto_assign` flag; OR'd in queries. `(lighton)`
+4. **Classification modification via custom processors** — classify pages for downstream routing. `(datalab)`
+5. **LLM map with enum output** — classification via structured output schema. `(docetl)` — with calibration for consistency.
+6. **Filter-based classification** — use metadata filtering and facets on user-defined metadata. `(mixedbread)`
+7. **Picture classification** — chart types, diagrams, logos, signatures. `(docling)`
+8. **Zero-shot classification via embeddings** — embed labels, compare cosine similarity. `(openai)`
+
+**Key parameters:** `docClass` (override) `(ibm)`; `content_type_path` `(lighton)`; `attribute_name`, `value` `(lighton)`; `class_match` threshold `(ibm)`.
+
+---
+
+## Phase C — Chunking & Enrichment
+
+### C1 Chunking / Splitting
 
 **Purpose:** Divide a parsed document into retrievable/embedding-ready segments.
 
@@ -298,18 +419,18 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 | Approach | Description | Systems |
 |---|---|---|
-| **Static / token-count** | Fixed token window with overlap. `max_chunk_size_tokens` (100–4096, default 800), `chunk_overlap_tokens` (default 400). | openai, google (`white_space_config`), mistral (`TokenTextSplitter`), docetl (`token_count`) |
-| **Character-count** | Fixed character window. `chunk_size` (default 1000). | mistral (`CharacterTextSplitter`) |
-| **Separator / hierarchical** | Split on configurable separators (paragraph, sentence, etc.) with fallback. | mistral (`SeparatorTextSplitter`), docetl (`delimiter`) |
-| **Markdown / header-aware** | Split by markdown headers (`#`, `##`...); preserve header context. | mistral (`MarkdownTextSplitter`), docling |
-| **Hierarchical / structure-pure** | One chunk per document element; merges list items; attaches headers/captions. | docling (`HierarchicalChunker`) |
-| **Hybrid (tokenization-aware)** | Splits oversized chunks, merges undersized peers; aligned to tokenizer; table-header repetition. | docling (`HybridChunker` — production default for RAG) |
-| **Line-based** | Preserves line boundaries (tables, code, logs, lists); supports repeated prefixes. | docling (`LineBasedTokenChunker`) |
-| **Word-count with overlap** | `chunk_size` words, `overlap` words. | knowledgegraph (AI-KG) |
-| **Structure-preserving (Docling-based)** | Token-bounded; tables/lists/section hierarchy intact; sentence→word→char fallback. | knowledgegraph (Docling-Graph) |
-| **Automatic / managed** | Platform-managed; not configurable. | lighton, mixedbread, google (default), openai (default) |
-| **Pre-chunked (bypass)** | Provide chunks directly via MXJSON/MXJSONL. | mixedbread |
-| **Gather (context enrichment)** | Adds context from surrounding chunks (previous/next, head/middle/tail) + header hierarchy. | docetl (`Gather`) |
+| Static / token-count | Fixed token window with overlap. `max_chunk_size_tokens` (100–4096, default 800), `chunk_overlap_tokens` (default 400) | openai, google, mistral, docetl |
+| Character-count | Fixed character window. `chunk_size` (default 1000) | mistral |
+| Separator / hierarchical | Split on configurable separators (paragraph, sentence) with fallback | mistral, docetl |
+| Markdown / header-aware | Split by markdown headers (`#`, `##`...); preserve header context | mistral, docling |
+| Hierarchical / structure-pure | One chunk per document element; merges list items; attaches headers/captions | docling (`HierarchicalChunker`) |
+| Hybrid (tokenization-aware) | Splits oversized chunks, merges undersized peers; aligned to tokenizer; table-header repetition. Production default for RAG | docling (`HybridChunker`) |
+| Line-based | Preserves line boundaries (tables, code, logs, lists); supports repeated prefixes | docling (`LineBasedTokenChunker`) |
+| Word-count with overlap | `chunk_size` words, `overlap` words | knowledgegraph (AI-KG) |
+| Structure-preserving (Docling-based) | Token-bounded; tables/lists/section hierarchy intact; sentence→word→char fallback | knowledgegraph (Docling-Graph) |
+| Automatic / managed | Platform-managed; not configurable | lighton, mixedbread, google (default), openai (default) |
+| Pre-chunked (bypass) | Provide chunks directly via MXJSON/MXJSONL | mixedbread |
+| Gather (context enrichment) | Adds context from surrounding chunks (previous/next, head/middle/tail) + header hierarchy | docetl (`Gather`) |
 
 **Chunk types (union):** `text`, `image_url`, `audio_url`, `video_url` `(mixedbread)`; `content`, `image_annotation`, `summary` `(mistral)`.
 
@@ -325,7 +446,7 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.5 Chunk Enrichment & Contextualization
+### C2 Chunk Enrichment & Contextualization
 
 **Purpose:** Add metadata, summaries, or surrounding context to chunks during or after ingestion.
 
@@ -338,103 +459,9 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.6 Data Extraction (Fields, Tables, Key-Value Pairs, Annotations)
+## Phase D — Embedding, Indexing & Graph
 
-**Purpose:** Pull structured data (typed fields, tables, KV pairs) from documents using schemas or models.
-
-**Naming variants:** *Structured extraction* / *Extract* `(datalab, lighton, mistral, docetl)`, *Annotations* (BBox / Document) `(mistral)`, *KVP extraction* `(ibm)`, *structured output* `(google, openai)`, *Map operator* `(docetl)`.
-
-**Alternative extraction approaches (union):**
-
-1. **JSON-schema-driven LLM extraction** — provide a JSON Schema / Pydantic / Zod model; LLM fills it. `(datalab, google, lighton, mistral, mixedbread, docetl)` — with citations `(datalab)`, verification `(datalab)`, confidence scoring `(datalab)`.
-   - Extraction modes: `turbo` (image-only, no citations), `fast` (citations + scores), `balanced` (verification + reasoning + citations). `(datalab)`
-   - Page-aware: one result object per page, `null` for absent fields. `(lighton)`
-2. **BBox annotation** — per-image classification/description via schema. `(mistral)`
-3. **Document annotation** — document-level structured extraction via schema. `(mistral)`
-4. **KVP extraction with ontology** — key + value with coordinates, confidence, KeyClass tagging, validators. `(ibm)` — three output tiers: basic (best KVP per key class), detailed (all candidates ranked), verbose (full OCR + tables + classification).
-5. **Table / line-item extraction** — recursive `ComplexKVPStructure` with nested rows/cells. `(ibm)` — supports nested tables.
-6. **Semantic normalization** — cleans/standardizes values (names, addresses) with `OriginalValue` preservation. `(ibm)`
-7. **Verbatim text extraction** — pull source text without synthesis; line_number or regex strategy; lower token cost, no hallucination. `(docetl — `Extract` operator)`
-8. **Form filling** — fill PDF/image forms with field data; AcroForm + visual + image field detection; confidence threshold. `(datalab)`
-9. **Schema auto-generation** — generate candidate extraction schemas (simple/moderate/complex) from a checkpoint. `(datalab)`
-10. **Pydantic-template extraction** — schema-first Pydantic models define both extraction schema AND graph structure; one-to-one or many-to-one strategies. `(knowledgegraph)`
-11. **Dense extraction** — two-phase skeleton-then-flesh extraction contract for large documents. `(knowledgegraph)`
-
-**Key parameters (union):**
-- `page_schema` / `schema` / `response_format` / `document_annotation_format` / `output.schema` — the schema.
-- `schema_id` / `schema_version` — saved schema reference. `(datalab)`
-- `extraction_mode` — `turbo`/`fast`/`balanced`. `(datalab)`
-- `checkpoint_id` — reuse prior parse. `(datalab)`
-- `confidence_threshold` — form filling. `(datalab)`
-- `field_data` — form filling input. `(datalab)`
-- `docClass` — skip classification for known document type. `(ibm)`
-- `jsonOptions` — capability toggles (`KVP`, `SN`, `MT`, `CHAR`). `(ibm)`
-
-**Output quality signals (union):**
-- Per-field citations (block IDs traceable to source). `(datalab)`
-- Per-field verification status (`PASS`/`FAIL_UNRESOLVABLE`/`FAIL_FIX`/`FAIL_CITATIONS`/`ITEMS_MISSING`). `(datalab)`
-- Per-field confidence score (1–5) + reasoning. `(datalab)`
-- Per-field `KeyConfidence`/`ValueConfidence`/`KeyClassConfidence`. `(ibm)`
-- Extraction score average. `(datalab)`
-- Parse quality score (0–5). `(datalab)`
-
----
-
-### 3.7 Classification & Categorization (Taxonomies, Facets, Tags)
-
-**Purpose:** Assign documents/chunks to categories, manage taxonomies, and use categories as search filters.
-
-**Alternative approaches (union):**
-
-1. **AI document classification** — assign to a known document class with confidence + alternate candidates. `(ibm)` — `Classification.DocumentClass` with `ClassConfidence`, `ClassMatch` (Low/Medium/High), `AlternateDocumentClass[]`.
-2. **Hierarchical content-type taxonomy (Facets)** — multi-tree taxonomy (max depth 4, `:`-path notation); typed, inheritable attributes per node; seed templates (finance, healthcare, legal, manufacturing, tech); file-level classify/unclassify/set_value/clear_value actions; sibling-conflict rules; filterable in search. `(lighton)`
-3. **Flat tags** — company-wide, non-hierarchical labels; `auto_assign` flag; OR'd in queries. `(lighton)`
-4. **Classification modification via custom processors** — classify pages for downstream routing. `(datalab)`
-5. **LLM map with enum output** — classification via structured output schema. `(docetl)` — with calibration for consistency.
-6. **Filter-based classification** — use metadata filtering and facets on user-defined metadata. `(mixedbread)`
-7. **Picture classification** — chart types, diagrams, logos, signatures. `(docling)`
-8. **Zero-shot classification via embeddings** — embed labels, compare cosine similarity. `(openai)`
-
-**Key parameters:** `docClass` (override) `(ibm)`; `content_type_path` `(lighton)`; `attribute_name`, `value` `(lighton)`; `class_match` threshold `(ibm)`.
-
----
-
-### 3.8 Entity Detection, Resolution, Deduplication & Linking
-
-**Purpose:** Identify entities, canonicalize duplicates, fix links, and build entity relationships.
-
-**Naming variants:** *Resolve* / *entity deduplication* `(docetl)`, *entity standardization* `(knowledgegraph)`, *entity resolution* / *dense dedupe* `(knowledgegraph)`, *link_resolve* `(docetl)`, *NodeIDRegistry* `(knowledgegraph)`, *Natural Language extractors* / `allSystemTKVPs` `(ibm)`.
-
-**Alternative approaches (union):**
-
-1. **Blocking + pairwise LLM comparison + union-find clustering + resolution** — reduce comparisons via code conditions and/or embedding similarity thresholds; auto-computed blocking threshold (95% recall target); union-find (DSU) for grouping; LLM resolution prompt. `(docetl)`
-2. **Deterministic node ID registry** — fingerprint hashing (`ClassName_fingerprint`); same entity always gets same node ID across batches; enables cross-document graph merging. `(knowledgegraph)`
-3. **LLM-based entity standardization** — cluster entity name variants into canonical nodes; remove self-referencing triples. `(knowledgegraph)`
-4. **Dense dedupe** — `off`/`standard`/`aggressive` LLM reconciliation of same-entity aliases / OCR noise. `(knowledgegraph)`
-5. **Link resolve** — fix links between items in a knowledge graph (one-sided; assumes canonical IDs); embedding blocking + LLM comparison. `(docetl)`
-6. **Equijoin (fuzzy join)** — join two datasets by LLM-evaluated semantic similarity; embedding blocking. `(docetl)`
-7. **Cross-references** — directional links between objects (across collections); manual entity-linking. `(weaviate)`
-8. **BARGAIN cascade** — cheap proxy model + oracle-labeled threshold learning with statistical guarantees for binary resolve/filter. `(docetl)`
-
-**Key parameters:** `blocking_keys`, `blocking_threshold`, `blocking_target_recall` (0.95), `blocking_conditions`, `comparison_prompt`, `resolution_prompt`, `embedding_model`, `cascade` (BARGAIN). `(docetl)`
-
----
-
-### 3.9 Clustering
-
-**Purpose:** Group items by semantic similarity.
-
-**Alternative approaches (union):**
-
-1. **Hierarchical agglomerative clustering** — binary tree of embeddings; cluster path annotation (most-specific → root); LLM-generated cluster summaries. `(docetl — `Cluster` operator)`
-2. **KMeans on embeddings** — discover hidden groupings. `(openai)`
-3. **Louvain community detection** — color-coded clusters in visualization. `(knowledgegraph)`
-4. **Value sampling cluster** — k-means for representative subset selection in reduce. `(docetl)`
-5. **t-SNE visualization** — 2D cluster diagnostics. `(openai)`
-
----
-
-### 3.10 Embedding / Vectorization
+### D1 Embedding / Vectorization
 
 **Purpose:** Convert text/images/audio/video into numeric vectors for semantic search.
 
@@ -442,17 +469,19 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 **Alternative approaches (union):**
 
-1. **Auto-vectorization on insert** — vectorizer module generates vectors from object properties automatically. `(weaviate)` — providers: OpenAI, Cohere, Google, Hugging Face, Ollama, Jina, NVIDIA, Mistral, AWS, Voyage AI, Transformers (self-hosted).
-2. **Managed automatic embedding** — platform embeds during ingestion; not exposed. `(google, lighton, mixedbread, openai-vector-stores)`
-3. **Standalone embedding API** — generate vectors for arbitrary text; return to client for own vector DB. `(openai — `embeddings.create`)` — models: `text-embedding-3-small` (1536d), `text-embedding-3-large` (3072d), `ada-002` (1536d); `dimensions` param (MRL shortening); `encoding_format` (float/base64).
-4. **Configurable embedder** — pluggable `Embedder` ABC. `(mistral)` — models: 1024-dim, 256-dim, 128-dim.
-5. **Named vectors (multi-model)** — multiple vector spaces per collection, each with independent vectorizer + index + compression; multi-model search on same data. `(weaviate)`
-6. **Multi-vector embeddings** — ColBERT/ColPali-style multi-vector. `(weaviate)` (v1.30+)
-7. **Multimodal embeddings** — text + images in unified vector space; text query retrieves images and vice versa. `(google — `gemini-embedding-2`)`
-8. **Vision (VLM) embeddings** — VLM embeddings over page images for searching visual documents. `(lighton)` — parallel `status_vision` pipeline.
-9. **Whole-document embeddings** — `mixedbread-ai/mxbai-wholembed-v3`; required for audio/video. `(mixedbread)`
-10. **Self-provided vectors** — user supplies vectors; no vectorizer. `(weaviate)`
-11. **Embeddings as ML features** — for classification, clustering, regression, recommendations. `(openai)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Auto-vectorization on insert | Vectorizer module generates vectors from object properties automatically. Providers: OpenAI, Cohere, Google, Hugging Face, Ollama, Jina, NVIDIA, Mistral, AWS, Voyage AI, Transformers (self-hosted) | weaviate |
+| 2 | Managed automatic embedding | Platform embeds during ingestion; not exposed | google, lighton, mixedbread, openai (Vector Stores) |
+| 3 | Standalone embedding API | Generate vectors for arbitrary text; return to client for own vector DB. Models: `text-embedding-3-small` (1536d), `text-embedding-3-large` (3072d), `ada-002`; `dimensions` (MRL shortening); `encoding_format` (float/base64) | openai |
+| 4 | Configurable embedder | Pluggable `Embedder` ABC. Models: 1024-dim, 256-dim, 128-dim | mistral |
+| 5 | Named vectors (multi-model) | Multiple vector spaces per collection, each with independent vectorizer + index + compression; multi-model search on same data | weaviate |
+| 6 | Multi-vector embeddings | ColBERT/ColPali-style multi-vector | weaviate (v1.30+) |
+| 7 | Multimodal embeddings | Text + images in unified vector space; text query retrieves images and vice versa | google (`gemini-embedding-2`) |
+| 8 | Vision (VLM) embeddings | VLM embeddings over page images for searching visual documents; parallel `status_vision` pipeline | lighton |
+| 9 | Whole-document embeddings | `mixedbread-ai/mxbai-wholembed-v3`; required for audio/video | mixedbread |
+| 10 | Self-provided vectors | User supplies vectors; no vectorizer | weaviate |
+| 11 | Embeddings as ML features | For classification, clustering, regression, recommendations | openai |
 
 **Key parameters (union):**
 - `model` / `embedding_model` / `model_name` — model selection.
@@ -467,13 +496,12 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.11 Indexing & Storage
+### D2 Indexing & Storage
 
 **Purpose:** Persist documents, vectors, inverted indexes, and graph structures for fast retrieval.
 
 **Alternative index/storage approaches (union):**
-
-1. **Managed vector store (auto-indexed)** — platform manages embeddings, indexing, sharding; zero infrastructure. `(google, lighton, mixedbread, openai)` — free storage in some `(google)`.
+1. **Managed vector store (auto-indexed)** — platform manages embeddings, indexing, sharding; zero infrastructure. Free storage in some. `(google, lighton, mixedbread, openai)`
 2. **Self-hosted vector database** — HNSW/Flat/Dynamic/HFresh index types; LSM-Tree storage; WAL + HNSW snapshots; lazy shard loading; async indexing. `(weaviate)`
 3. **Vespa vector store** — swappable schema with `embedding_dimensions`, `indexing_mode`, `SearchMode`. `(mistral)`
 4. **LanceDB local index** — FTS, embedding, or hybrid; no server. `(docetl)`
@@ -512,23 +540,91 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 **Multi-tenancy:** Per-tenant sharding; 50,000+ active shards per node; auto-tenant creation; tenant lifecycle (ACTIVE → INACTIVE → OFFLOADED to S3). `(weaviate)`
 
-**Idempotent ingestion:** Deterministic UUID5 / `external_id` — re-ingesting overwrites, not duplicates. `(weaviate, mistral, lighton, mixedbread)`
+---
+
+### D3 Entity Detection, Resolution, Deduplication & Linking
+
+**Purpose:** Identify entities, canonicalize duplicates, fix links, and build entity relationships.
+
+**Naming variants:** *Resolve* / *entity deduplication* `(docetl)`, *entity standardization* `(knowledgegraph)`, *entity resolution* / *dense dedupe* `(knowledgegraph)`, *link_resolve* `(docetl)`, *NodeIDRegistry* `(knowledgegraph)`, *Natural Language extractors* / `allSystemTKVPs` `(ibm)`.
+
+**Alternative approaches (union):**
+1. **Blocking + pairwise LLM comparison + union-find clustering + resolution** — reduce comparisons via code conditions and/or embedding similarity thresholds; auto-computed blocking threshold (95% recall target); union-find (DSU) for grouping; LLM resolution prompt. `(docetl)`
+2. **Deterministic node ID registry** — fingerprint hashing (`ClassName_fingerprint`); same entity always gets same node ID across batches; enables cross-document graph merging. `(knowledgegraph)`
+3. **LLM-based entity standardization** — cluster entity name variants into canonical nodes; remove self-referencing triples. `(knowledgegraph)`
+4. **Dense dedupe** — `off`/`standard`/`aggressive` LLM reconciliation of same-entity aliases / OCR noise. `(knowledgegraph)`
+5. **Link resolve** — fix links between items in a knowledge graph (one-sided; assumes canonical IDs); embedding blocking + LLM comparison. `(docetl)`
+6. **Equijoin (fuzzy join)** — join two datasets by LLM-evaluated semantic similarity; embedding blocking. `(docetl)`
+7. **Cross-references** — directional links between objects (across collections); manual entity-linking. `(weaviate)`
+8. **BARGAIN cascade** — cheap proxy model + oracle-labeled threshold learning with statistical guarantees for binary resolve/filter. `(docetl)`
+
+**Key parameters:** `blocking_keys`, `blocking_threshold`, `blocking_target_recall` (0.95), `blocking_conditions`, `comparison_prompt`, `resolution_prompt`, `embedding_model`, `cascade` (BARGAIN). `(docetl)`
 
 ---
 
-### 3.12 Search (Lexical, Vector, Hybrid, Agentic)
+### D4 Clustering
+
+**Purpose:** Group items by semantic similarity.
+
+**Alternative approaches (union):**
+1. **Hierarchical agglomerative clustering** — binary tree of embeddings; cluster path annotation (most-specific → root); LLM-generated cluster summaries. `(docetl — `Cluster` operator)`
+2. **KMeans on embeddings** — discover hidden groupings. `(openai)`
+3. **Louvain community detection** — color-coded clusters in visualization. `(knowledgegraph)`
+4. **Value sampling cluster** — k-means for representative subset selection in reduce. `(docetl)`
+5. **t-SNE visualization** — 2D cluster diagnostics. `(openai)`
+
+---
+
+### D5 Knowledge Graph Building
+
+**Purpose:** Build a graph of entities and relationships from documents.
+
+**Alternative approaches (union):**
+1. **Schema-validated Pydantic-driven pipeline** — Pydantic templates define extraction schema AND graph structure; deterministic provenance ledger; stable cross-batch node IDs; graph conversion to NetworkX `DiGraph`; export to CSV/Cypher/JSON/HTML. `(knowledgegraph — Docling-Graph)`
+   - Extraction contracts: `direct` (one-pass), `dense` (skeleton-then-flesh two-phase), `auto` (resolves per document).
+   - Backends: LLM (text, local/remote) or VLM (vision, local only).
+   - Gleaning: extra "what did you miss?" extraction pass.
+   - Dense dedupe: `off`/`standard`/`aggressive`.
+2. **Schema-free LLM triple extraction** — SPO triples (`subject`, `predicate`, `object`, `chunk`); entity standardization (LLM clustering of variants); relationship inference (rule-based transitivity + lexical similarity + LLM-assisted subgraph bridging); PyVis HTML visualization with Louvain communities. `(knowledgegraph — AI-Knowledge-Graph)`
+3. **Native graph database storage** — Neo4j with Cypher CRUD; index-free adjacency; ACID; GraphRAG; MCP server for agent tool exposure. `(knowledgegraph — Neo4j)`
+4. **Link resolve** — fix links between items in a knowledge graph (one-sided). `(docetl)`
+5. **Cross-references** — directional links between objects (across collections). `(weaviate)`
+
+**Graph export formats:** CSV (Neo4j-compatible), Cypher script, JSON (node-link), HTML visualization, Docling outputs. `(knowledgegraph)`
+
+**Graph statistics:** `node_count`, `edge_count`, `node_types`, `edge_types`, `avg_degree`, `density`. `(knowledgegraph)`
+
+**Provenance levels:** `off` / `standard` / `detailed` (with char-offset spans). `(knowledgegraph)`
+
+---
+
+## Phase E — Query Time (Read Path)
+
+> The stages below are ordered as they execute at query time: the user query is **rewritten first**, then **searched**, then **filtered**, then **reranked**, with **caching** and **aggregations** available throughout.
+
+### E1 Query Rewriting & Preprocessing
+
+**Purpose:** Improve user queries *before* retrieval. This stage logically precedes search and reranking.
+
+**Alternative approaches:**
+1. **Query rewriting** — auto-rewrite into search-friendly form (strips conversational filler, converts to noun-phrase). `(openai — `rewrite_query`)`, `(mixedbread — `rewrite_query`)` — rewritten query observable in `search_query`.
+2. **LLM query rewriter** — reformulate informal queries. `(mistral — `LLMQueryRewriter`)`
+3. **LLM query extension** — generate multiple sub-queries for broader retrieval. `(mistral — `LLMQueryExtension`)`
+4. **Model-generated queries** — File Search tool generates its own queries (visible in `queries`). `(openai)`
+
+---
+
+### E2 Search (Lexical, Vector, Hybrid, Agentic)
 
 **Purpose:** Find relevant chunks/documents given a query.
 
-**Naming variants:** *Search* `(lighton, mixedbread, openai)`, *near_\** methods` `(weaviate)`, *Retrieval* `(openai, mistral)`, *File Search* `(google, openai)`, *Query* `(weaviate)`.
+**Naming variants:** *Search* `(lighton, mixedbread, openai)`, *near_\** methods* `(weaviate)`, *Retrieval* `(openai, mistral)`, *File Search* `(google, openai)`, *Query* `(weaviate)`.
 
-#### 3.12.1 Lexical / Keyword Search
-
+#### E2.1 Lexical / Keyword Search
 - **BM25 / BM25F** — token frequency + IDF; BM25F extends to weighted multi-field. `(weaviate)` — per-property tokenization (WORD, LOWERCASE, WHITESPACE, FIELD, TRIGRAM for fuzzy/typo tolerance); property boosting (`^weight`); `and`/`or` operators with `minimum_match`; accent folding; stopword presets.
 - **Grep (regex)** — RE2 regex pattern matching against literal chunk text; `content_groups` (text/generated); case sensitivity. `(mixedbread)`
 
-#### 3.12.2 Vector / Semantic Search
-
+#### E2.2 Vector / Semantic Search
 - `near_text`, `near_vector`, `near_object`, `near_image` `(weaviate)` — four input modalities.
 - `VectorRetriever` `(mistral)` — embedding-based semantic search.
 - Semantic search via embeddings `(google, lighton, mixedbread, openai)`.
@@ -536,22 +632,19 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 - **MMR (Maximal Marginal Relevance)** — diversity selection balancing relevance and diversity. `(weaviate)` (v1.37 preview)
 - **Autocut / auto_limit** — detect natural breaks in distance/score distribution. `(weaviate)`
 
-#### 3.12.3 Hybrid Search
-
+#### E2.3 Hybrid Search
 - **Vector + keyword fusion** — run both in parallel, fuse weighted by `alpha` (0=pure keyword, 1=pure vector, 0.5=balanced). `(weaviate)` — two fusion algorithms: `RELATIVE_SCORE` (default) / `RANKED` (`1/(RANK+60)`).
 - **Reciprocal Rank Fusion (RRF)** — blend semantic + keyword with tunable `embedding_weight`/`text_weight`. `(openai)` — at least one must be > 0.
 - **RRF for multi-retriever fusion** — `RRFRanker` with `rrf_k` smoothing. `(mistral)`
 - **Hybrid vector + keyword + vision** — vector similarity + keyword/text matching + optional cross-encoder reranking + vision mode. `(lighton)` — score breakdown per component (text/vision/keyword/multivector/relevance).
 - **Hybrid web + internal** — virtual web store in `store_identifiers`; web results always reranked, merged with internal. `(mixedbread)`
 
-#### 3.12.4 Agentic Search
-
+#### E2.4 Agentic Search
 - **Multi-round, agent-driven retrieval** — decompose complex questions into sub-queries; run multiple rounds; evaluate candidates; iterate; merge/rerank. `(mixedbread — `agentic`)` — `max_rounds`, `queries_per_round`, `instructions` (natural-language steering), `strict_top_k`, `score_threshold`.
 - **Query Agent** — LLM translates natural language into database operations (searches, aggregations, filters, sorts across collections). `(weaviate)` — modes: Ask (answer + sources), Search (raw objects), Suggest (query discovery); streaming with progress; `additional_filters`; `view_properties`; pagination reusing searches.
 - **Model-autonomous File Search** — model decides when to search, generates queries, synthesizes answers. `(openai)`
 
-#### 3.12.5 Other Search Modes
-
+#### E2.5 Other Search Modes
 - **List Chunks** — metadata-only retrieval (no embeddings, no similarity, no reranking); sort by metadata. `(mixedbread)`
 - **Multi-store / federated search** — search across multiple stores in one query. `(google, mixedbread)`
 - **Cross-collection Explore** — GraphQL function. `(weaviate)`
@@ -572,7 +665,7 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.13 Filtering, Facets & Metadata Scoping
+### E3 Filtering, Facets & Metadata Scoping
 
 **Purpose:** Narrow search results by metadata before or after retrieval.
 
@@ -597,14 +690,13 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.14 Reranking
+### E4 Reranking
 
-**Purpose:** Second-stage reordering of retrieved results with a more expensive model for sharper relevance.
+**Purpose:** Second-stage reordering of retrieved results with a more expensive model for sharper relevance. Runs *after* search and filtering.
 
 **Naming variants:** *Rerank* `(weaviate)`, *Reranker* `(mistral)`, *relevance_scoring* `(lighton)`, *rerank* `(mixedbread)`. Not present in `(openai, google)` as a separate API.
 
 **Alternative reranking approaches (union):**
-
 1. **Cross-encoder reranking** — pointwise model re-evaluates query-chunk pairs. `(weaviate, mistral, lighton, mixedbread)` — providers: Cohere, Hugging Face, Voyage AI, Contextual AI, Transformers; models: `mxbai-rerank-large-v2` (pointwise), `cross-encoder/ms-marco-MiniLM-L-6-v2`.
 2. **Listwise reranking** — instruction-steerable via natural language (`mxbai-rerank-v3-listwise`); inject ranking policies ("prefer recent docs", "prioritize primary sources"). `(mixedbread)`
 3. **LLM reranking** — deep LLM scoring, 1 call per chunk. `(mistral — `LLMReRanker`)`
@@ -619,21 +711,9 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.15 Query Rewriting & Preprocessing
+### E5 Caching
 
-**Purpose:** Improve user queries before retrieval.
-
-**Alternative approaches:**
-1. **Query rewriting** — auto-rewrite into search-friendly form (strips conversational filler, converts to noun-phrase). `(openai — `rewrite_query`)`, `(mixedbread — `rewrite_query`)` — rewritten query observable in `search_query`.
-2. **LLM query rewriter** — reformulate informal queries. `(mistral — `LLMQueryRewriter`)`
-3. **LLM query extension** — generate multiple sub-queries for broader retrieval. `(mistral — `LLMQueryExtension`)`
-4. **Model-generated queries** — File Search tool generates its own queries (visible in `queries`). `(openai)`
-
----
-
-### 3.16 Caching
-
-**Purpose:** Skip embedding/retrieval/reranking on cache hits.
+**Purpose:** Skip embedding/retrieval/reranking on cache hits. Caching spans both index and query time.
 
 **Alternative approaches:**
 1. **Semantic cache** — match queries by meaning via cosine similarity threshold (0.99 strict / 0.95 balanced / 0.90 permissive); skip retrieval on hit; eviction policies (LRU/LFU/FIFO); TTL; metrics tracking. `(mistral — `CachedQueryEngine`, `SemanticCache`)`
@@ -645,7 +725,22 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.17 Answer Generation / RAG / QA
+### E6 Aggregations, Grouped Search & Analytics
+
+**Purpose:** Compute metrics over result sets; group results.
+
+**Alternative approaches:**
+1. **Aggregate queries** — counts, statistics (sum, max, min, mean, median, mode), frequency distributions (top_occurrences), boolean percentages, reference counts; GroupByAggregate for per-group metrics. `(weaviate)`
+2. **Grouped search (GroupBy)** — organize results into groups by property or cross-reference; `objects_per_group`, `number_of_groups`. `(weaviate)`
+3. **Reduce operator** — group by `reduce_key`, produce one output per group; incremental folding; scratchpad; value sampling. `(docetl)`
+4. **Facets** — aggregate chunk counts by metadata values. `(mixedbread)`
+5. **Rank operator** — full sorting by latent attribute (not top-k retrieval); "picky window" refinement; O(n) scaling. `(docetl)`
+
+---
+
+## Phase F — Generation & Output
+
+### F1 Answer Generation / RAG / QA
 
 **Purpose:** Generate grounded answers from retrieved chunks with citations.
 
@@ -653,16 +748,18 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 **Alternative RAG approaches (union):**
 
-1. **Hosted RAG (model-autonomous)** — model decides when to search, retrieves, generates with inline citations. `(openai — File Search tool)` — `file_citation` annotations with character offsets.
-2. **Managed RAG (one-call)** — retrieve-then-generate in one API call; citations via `<cite i="n"/>` markers mapping to `sources[n]`. `(mixedbread — Question Answering)` — multimodal, streaming, instructions for answer style.
-3. **Two-stage retrieve + generate** — Search then Ask; SSE streaming (OpenAI-compatible); source attribution. `(lighton — Ask)`
-4. **Generative search integrated into search calls** — Single Prompt (per-object) + Grouped Task (per-group); `{property_name}` interpolation; multimodal (images in prompts); query-time model override. `(weaviate)`
-5. **Retrieval API + manual synthesis** — direct search returns chunks; developer feeds to `chat.completions.create` with `<sources>` XML pattern. `(openai)`
-6. **Document QnA** — Chat Completions with `document_url` content block; multi-document queries. `(mistral)`
-7. **RAG via retriever + map/reduce** — attach retriever to map/filter/reduce/extract; inject `{{ retrieval_context }}`. `(docetl)`
-8. **GraphRAG** — vector search + graph traversal for multi-hop reasoning; patterns: vector+graph, agentic retrieval, entity-centric RAG, ontology-driven RAG. `(knowledgegraph — Neo4j)`
-9. **Query Agent Ask mode** — natural language → answer + sources across collections. `(weaviate)`
-10. **Structured grounded output** — JSON Schema + file search for machine-readable grounded responses. `(google)` (Gemini 3+)
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Hosted RAG (model-autonomous) | Model decides when to search, retrieves, generates with inline citations. `file_citation` annotations with character offsets | openai (File Search tool) |
+| 2 | Managed RAG (one-call) | Retrieve-then-generate in one API call; citations via `<cite i="n"/>` markers mapping to `sources[n]`; multimodal, streaming, instructions | mixedbread (Question Answering) |
+| 3 | Two-stage retrieve + generate | Search then Ask; SSE streaming (OpenAI-compatible); source attribution | lighton (Ask) |
+| 4 | Generative search in search calls | Single Prompt (per-object) + Grouped Task (per-group); `{property_name}` interpolation; multimodal (images in prompts); query-time model override | weaviate |
+| 5 | Retrieval API + manual synthesis | Direct search returns chunks; developer feeds to `chat.completions.create` with `<sources>` XML pattern | openai |
+| 6 | Document QnA | Chat Completions with `document_url` content block; multi-document queries | mistral |
+| 7 | RAG via retriever + map/reduce | Attach retriever to map/filter/reduce/extract; inject `{{ retrieval_context }}` | docetl |
+| 8 | GraphRAG | Vector search + graph traversal for multi-hop reasoning; patterns: vector+graph, agentic retrieval, entity-centric RAG, ontology-driven RAG | knowledgegraph (Neo4j) |
+| 9 | Query Agent Ask mode | Natural language → answer + sources across collections | weaviate |
+| 10 | Structured grounded output | JSON Schema + file search for machine-readable grounded responses | google (Gemini 3+) |
 
 **Citation mechanisms (union):**
 - `file_citation` with `file_name`, `page_number`, `media_id`, `custom_metadata`. `(google, openai)`
@@ -686,49 +783,11 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.18 Knowledge Graph Building
-
-**Purpose:** Build a graph of entities and relationships from documents.
-
-**Alternative approaches (union):**
-
-1. **Schema-validated Pydantic-driven pipeline** — Pydantic templates define extraction schema AND graph structure; deterministic provenance ledger; stable cross-batch node IDs; graph conversion to NetworkX `DiGraph`; export to CSV/Cypher/JSON/HTML. `(knowledgegraph — Docling-Graph)`
-   - Extraction contracts: `direct` (one-pass), `dense` (skeleton-then-flesh two-phase), `auto` (resolves per document).
-   - Backends: LLM (text, local/remote) or VLM (vision, local only).
-   - Gleaning: extra "what did you miss?" extraction pass.
-   - Dense dedupe: `off`/`standard`/`aggressive`.
-2. **Schema-free LLM triple extraction** — SPO triples (`subject`, `predicate`, `object`, `chunk`); entity standardization (LLM clustering of variants); relationship inference (rule-based transitivity + lexical similarity + LLM-assisted subgraph bridging); PyVis HTML visualization with Louvain communities. `(knowledgegraph — AI-Knowledge-Graph)`
-3. **Native graph database storage** — Neo4j with Cypher CRUD; index-free adjacency; ACID; GraphRAG; MCP server for agent tool exposure. `(knowledgegraph — Neo4j)`
-4. **Link resolve** — fix links between items in a knowledge graph (one-sided). `(docetl)`
-5. **Cross-references** — directional links between objects (across collections). `(weaviate)`
-
-**Graph export formats:** CSV (Neo4j-compatible), Cypher script, JSON (node-link), HTML visualization, Docling outputs. `(knowledgegraph)`
-
-**Graph statistics:** `node_count`, `edge_count`, `node_types`, `edge_types`, `avg_degree`, `density`. `(knowledgegraph)`
-
-**Provenance levels:** `off` / `standard` / `detailed` (with char-offset spans). `(knowledgegraph)`
-
----
-
-### 3.19 Aggregations, Grouped Search & Analytics
-
-**Purpose:** Compute metrics over result sets; group results.
-
-**Alternative approaches:**
-1. **Aggregate queries** — counts, statistics (sum, max, min, mean, median, mode), frequency distributions (top_occurrences), boolean percentages, reference counts; GroupByAggregate for per-group metrics. `(weaviate)`
-2. **Grouped search (GroupBy)** — organize results into groups by property or cross-reference; `objects_per_group`, `number_of_groups`. `(weaviate)`
-3. **Reduce operator** — group by `reduce_key`, produce one output per group; incremental folding; scratchpad; value sampling. `(docetl)`
-4. **Facets** — aggregate chunk counts by metadata values. `(mixedbread)`
-5. **Rank operator** — full sorting by latent attribute (not top-k retrieval); "picky window" refinement; O(n) scaling. `(docetl)`
-
----
-
-### 3.20 Document Transformation & Round-trip (Generation, Form Filling, Track Changes)
+### F2 Document Transformation & Round-trip
 
 **Purpose:** Generate or transform documents (not just extract from them).
 
 **Alternative approaches (union):**
-
 1. **DOCX generation from markdown** — `create-document`; native Word formatting; track changes revision marks (`<ins>`, `~~`, `<comment>` tags with author/datetime). `(datalab)`
 2. **Form filling** — fill PDF/image forms with structured data; AcroForm + visual + image field detection; confidence threshold; PDF or PNG output. `(datalab)`
 3. **Track changes extraction** — extract redlines (insertions/deletions) and comments from DOCX as Markdown/HTML/chunks with annotation tags. `(datalab)`
@@ -739,25 +798,27 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.21 Orchestration, Pipelines & Workflows
+## Phase G — Cross-Cutting Concerns
+
+> These concerns wrap or span the entire pipeline. They are not linear stages but apply across phases A–F.
+
+### G1 Orchestration, Pipelines & Workflows
 
 **Purpose:** Chain multiple processing steps into reusable, versioned executions.
 
 **Alternative orchestration approaches (union):**
 
-1. **Declarative pipelines (YAML/Python)** — ordered operators with draft→saved→published lifecycle; immutable versioned snapshots; per-step intermediate results; eval integration; per-step billing. `(datalab)`
-   - Step types: `convert`, `segment`, `extract`, `custom`, `fill`.
-   - Checkpoint passing between steps.
-2. **Temporal workflows** — Temporal-engine workflow definitions; long-running, fault-tolerant. `(datalab)`
-3. **Declarative map-reduce framework** — lazy, immutable Frame; chained operations; terminal actions trigger execution; Python API ↔ YAML convertible. `(docetl)`
-   - Operators: map, filter, reduce, resolve, equijoin, rank, extract, cluster, split, gather, unnest, sample, topk, parallel_map, link_resolve, code_map, code_reduce, code_filter.
-   - Tool-equipped agents on map/filter/reduce.
-4. **Pipeline + RoutedPipeline** — ingestion orchestration with checkpointing + progress callbacks; multi-format routing by extension/MIME. `(mistral)`
-5. **QueryEngine + CachedQueryEngine** — retrieval orchestration with optional caching. `(mistral)`
-6. **run_pipeline(config)** — template loading → extraction → Docling export → graph conversion → export → statistics. `(knowledgegraph)`
-7. **Pipeline class** — ingestion orchestrator: load → extract → chunk → enrich → embed → index. `(mistral)`
-8. **MCP server** — expose operations as tools for AI agents. `(docling, mixedbread, weaviate, knowledgegraph-Neo4j, lighton)`
-9. **Automatic managed pipeline** — no manual orchestration needed (chunk → embed → index automatic). `(google, lighton, mixedbread, openai)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Declarative pipelines (YAML/Python) | Ordered operators with draft→saved→published lifecycle; immutable versioned snapshots; per-step intermediate results; eval integration; per-step billing | datalab |
+| 2 | Temporal workflows | Temporal-engine workflow definitions; long-running, fault-tolerant | datalab |
+| 3 | Declarative map-reduce framework | Lazy, immutable Frame; chained operations; terminal actions trigger execution; Python API ↔ YAML convertible. Operators: map, filter, reduce, resolve, equijoin, rank, extract, cluster, split, gather, unnest, sample, topk, parallel_map, link_resolve, code_map, code_reduce, code_filter. Tool-equipped agents on map/filter/reduce | docetl |
+| 4 | Pipeline + RoutedPipeline | Ingestion orchestration with checkpointing + progress callbacks; multi-format routing by extension/MIME | mistral |
+| 5 | QueryEngine + CachedQueryEngine | Retrieval orchestration with optional caching | mistral |
+| 6 | run_pipeline(config) | Template loading → extraction → Docling export → graph conversion → export → statistics | knowledgegraph |
+| 7 | Pipeline class | Ingestion orchestrator: load → extract → chunk → enrich → embed → index | mistral |
+| 8 | MCP server | Expose operations as tools for AI agents | docling, mixedbread, weaviate, knowledgegraph-Neo4j, lighton |
+| 9 | Automatic managed pipeline | No manual orchestration needed (chunk → embed → index automatic) | google, lighton, mixedbread, openai |
 
 **Orchestration features:**
 - **Checkpointing** — skip already-processed documents on restart. `(mistral, datalab)`
@@ -769,36 +830,37 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.22 Evaluation, Quality Assurance & Optimization
+### G2 Evaluation, Quality Assurance & Optimization
 
 **Purpose:** Measure and improve pipeline quality.
 
 **Alternative approaches (union):**
 
-1. **Parse quality score** — 0–5 self-assessment of conversion quality. `(datalab)`
-2. **Eval rubrics** — block/page/document rules scoring 0–5; `eval_rubric_id` on convert/extract/pipeline steps; generation from user feedback. `(datalab)`
-3. **Forge Evals** — configuration comparison (max 10 docs, 5 configs, 3 iterations); visual diffs; multi-model comparison. `(datalab)`
-4. **Custom processor eval definitions** — `eval_definition` per processor; `run_eval` on execution. `(datalab)`
-5. **Per-field verification** — balanced-mode per-field independent validation (PASS/FAIL) against source. `(datalab)`
-6. **Per-field confidence scoring** — 1–5 score with reasoning. `(datalab)`
-7. **KVP validation** — per-KeyClass validators defined in ontology; `POST /validator` applies them. `(ibm)` — `ValidatorResult` ("Pass"/"Fail") + `ValidatorFailures`.
-8. **Gleaning** — LLM-based iterative validation/refinement of operator output. `(docetl)`
-9. **Validate** — Python-expression-based output validation with retries. `(docetl)`
-10. **Calibration** — reference anchors for consistent classification/scoring. `(docetl)`
-11. **Plan rewrites** — automatic equivalence-preserving pipeline reordering (selection_pushdown, limit_pushdown). `(docetl)`
-12. **BARGAIN model cascades** — statistical guarantees (accuracy/precision/recall) on binary operators with probability `1 - delta`. `(docetl)`
-13. **MOAR (offline MCTS optimization)** — multi-objective agentic rewrites; Pareto-optimal cost-accuracy frontier. `(docetl)`
-14. **Operation-level `optimize` flag** — inline optimization. `(docetl)`
-15. **Semantic cache metrics** — hit_rate, avg_hit_similarity, retrieval time. `(mistral)`
+| # | Approach | Description | Systems |
+|---|---|---|---|
+| 1 | Parse quality score | 0–5 self-assessment of conversion quality | datalab |
+| 2 | Eval rubrics | block/page/document rules scoring 0–5; `eval_rubric_id` on convert/extract/pipeline steps; generation from user feedback | datalab |
+| 3 | Forge Evals | configuration comparison (max 10 docs, 5 configs, 3 iterations); visual diffs; multi-model comparison | datalab |
+| 4 | Custom processor eval definitions | `eval_definition` per processor; `run_eval` on execution | datalab |
+| 5 | Per-field verification | balanced-mode per-field independent validation (PASS/FAIL) against source | datalab |
+| 6 | Per-field confidence scoring | 1–5 score with reasoning | datalab |
+| 7 | KVP validation | per-KeyClass validators defined in ontology; `POST /validator` applies them; `ValidatorResult` ("Pass"/"Fail") + `ValidatorFailures` | ibm |
+| 8 | Gleaning | LLM-based iterative validation/refinement of operator output | docetl |
+| 9 | Validate | Python-expression-based output validation with retries | docetl |
+| 10 | Calibration | reference anchors for consistent classification/scoring | docetl |
+| 11 | Plan rewrites | automatic equivalence-preserving pipeline reordering (selection_pushdown, limit_pushdown) | docetl |
+| 12 | BARGAIN model cascades | statistical guarantees (accuracy/precision/recall) on binary operators with probability `1 - delta` | docetl |
+| 13 | MOAR (offline MCTS optimization) | multi-objective agentic rewrites; Pareto-optimal cost-accuracy frontier | docetl |
+| 14 | Operation-level `optimize` flag | inline optimization | docetl |
+| 15 | Semantic cache metrics | hit_rate, avg_hit_similarity, retrieval time | mistral |
 
 ---
 
-### 3.23 Provenance, Citations & Source Tracking
+### G3 Provenance, Citations & Source Tracking
 
 **Purpose:** Link outputs back to source document locations for verifiability and trust.
 
 **Alternative approaches (union):**
-
 1. **Block IDs** — `data-block-id` attributes on HTML elements; `{field}_citations` arrays traceable to `/page/0/Text/3` style locations. `(datalab)`
 2. **`file_citation` annotations** — `file_name`, `page_number`, `media_id`, `custom_metadata`. `(google, openai)` — character offsets for inline attribution `(openai)`.
 3. **`<cite i="n"/>` markers** → `sources[n]` chunks. `(mixedbread)`
@@ -812,7 +874,7 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.24 Visualization
+### G4 Visualization
 
 **Purpose:** Visually explore graphs, clusters, and document structure.
 
@@ -825,7 +887,7 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-### 3.25 Multi-tenancy, Security, Residency & Administration
+### G5 Multi-tenancy, Security, Residency & Administration
 
 **Multi-tenancy:**
 - Per-tenant sharding; auto-tenant creation; tenant lifecycle (ACTIVE → INACTIVE → OFFLOADED to S3). `(weaviate)`
@@ -864,343 +926,355 @@ The exhaustive pipeline below is ordered from raw input to final answer and beyo
 
 ---
 
-## 4. Naming Variant Cross-Reference Table
+# Part III — The Unified API Specification
 
-| Concept | Variant names (system) |
-|---|---|
-| Document container | Workspace (lighton), Store / search index (mixedbread), Vector Store (openai), FileSearchStore (google), Collection / schema / class (weaviate), Project (ibm), Dataset / Frame (docetl) |
-| Document / input unit | File (datalab, openai, mistral, mixedbread), Data Object (weaviate), Document (google, docling), Item / row (docetl), Analyzer (ibm) |
-| Chunk | Chunk (weaviate, mixedbread, mistral, openai), DocumentChunk (mistral), block (datalab, docling, ibm), content item (docling) |
-| Embedding | Vector (weaviate, openai), embedding (google, mistral, mixedbread, lighton, docetl) |
-| Embedding component | Vectorizer module (weaviate), Embedder (mistral), Embedding model (google, openai) |
-| Schema | page_schema / schema_id (datalab), Pydantic template (knowledgegraph), ontology / KeyClass (ibm), JSON Schema (google, lighton, mixedbread, mistral), output schema (docetl), collection schema (weaviate) |
-| Citation / provenance | file_citation (google, openai), citations / block IDs (datalab), provenance / ProvenanceLedger (knowledgegraph), source attribution (lighton, mixedbread) |
-| RAG / QA | Generative search (weaviate), Ask (lighton), Question Answering (mixedbread), File Search tool (openai), Document QnA (mistral), File Search (google) |
-| Reranking | Rerank (weaviate), Reranker (mistral), relevance_scoring (lighton), rerank (mixedbread) |
-| Pipeline / orchestration | Pipeline (datalab, mistral, docetl), Workflow / Temporal (datalab), operator chain / Frame (docetl), run_pipeline (knowledgegraph), ingestion pipeline (mixedbread, lighton) |
-| Classification metadata | Facet / content-type (lighton), tag (lighton), attribute (openai, lighton, weaviate), custom_metadata (google, mixedbread) |
-| Tenancy / isolation | Workspace (lighton), Tenant (weaviate), Organization (mixedbread), team context (datalab) |
-| Quantization / compression | Quantization (weaviate) — PQ/BQ/SQ/RQ |
-| Segmentation | Document Segmentation (datalab), DS/SHW (ibm) |
-| Entity dedup | Resolve (docetl), entity standardization (knowledgegraph), entity resolution / dense dedupe (knowledgegraph), link_resolve (docetl) |
-| Filter | where clause / pre-filter (weaviate), attribute_filter / filters (openai, mixedbread), metadata_filter (google), content_type[]/attribute[] (lighton) |
-| Hybrid fusion | RELATIVE_SCORE / RANKED (weaviate), RRF (openai, mistral), hybrid (lighton) |
-| Expiration | expires_after (openai, mixedbread), TTL (weaviate), result retention (datalab), raw file 48h (google) |
-| Chunking | Chunking (openai, google, docling, mistral), Split (docetl), TextSplitter (mistral), DocumentChunker (knowledgegraph) |
+This part defines a **provider-agnostic API** that encompasses all features of the eleven surveyed systems. It is written as a specification for a hypothetical "super complete" document-intelligence platform, for an API consumer who wants to build document-intelligence applications.
+
+> **Conventions:** All endpoints are RESTful under a base URL `https://api.unified-docintel.example/v1`. Parameters shown in `monospace` are JSON body fields or query params. Async operations follow submit→poll/webhook→retrieve. The spec uses unified naming; the synonym glossary in Part I maps to individual systems. `WS` denotes a WebSocket endpoint.
+
+## API Surface Overview
+
+```
+Authentication & Administration:
+  POST   /v1/api-keys                       — Create scoped API key (roles, workspace-scoped)
+  GET    /v1/api-keys                        — List API keys
+  DELETE /v1/api-keys/{id}                   — Revoke API key
+  GET    /v1/health                          — Health check (no auth)
+  GET    /v1/version                          — Version info
+  GET    /v1/budgets                          — Get org budget
+  PATCH  /v1/budgets                          — Update monthly cap + alert thresholds
+  GET    /v1/usage                            — Usage/billing summary (tokens, pages, storage)
+
+Workspaces (Containers):
+  POST   /v1/workspaces                       — Create workspace
+  GET    /v1/workspaces                        — List workspaces (pagination)
+  GET    /v1/workspaces/{id}                  — Get workspace
+  PUT    /v1/workspaces/{id}                  — Update workspace
+  DELETE /v1/workspaces/{id}                  — Delete workspace (cascade)
+  GET    /v1/workspaces/{id}/documents        — List indexed documents
+  GET    /v1/workspaces/{id}/documents/{doc}  — Get indexed document
+  DELETE /v1/workspaces/{id}/documents/{doc}  — Delete indexed document (cascade to embeddings)
+  POST   /v1/workspaces/{id}/tenants          — Create tenants
+  GET    /v1/workspaces/{id}/tenants           — List tenants
+  PUT    /v1/workspaces/{id}/tenants          — Update tenant activity_status
+
+Files (Upload & Ingestion):
+  POST   /v1/files                            — Upload file (multipart | URL | base64)
+  POST   /v1/files/uploads                    — Create multipart/resumable upload session
+  GET    /v1/files/uploads/{id}               — Get upload status + presigned URLs
+  POST   /v1/files/uploads/{id}/complete      — Complete multipart upload
+  POST   /v1/files/uploads/{id}/abort         — Abort multipart upload
+  POST   /v1/files/prechunked                 — Upload pre-chunked data (MXJSON/MXJSONL)
+  GET    /v1/files                             — List files (filter by workspace, status, tags, metadata)
+  GET    /v1/files/{id}                        — Get file metadata + status
+  GET    /v1/files/{id}/download              — Download original or rendered_pdf
+  GET    /v1/files/{id}/chunks                — List chunks of a file
+  PATCH  /v1/files/{id}                        — Update file metadata/attributes
+  DELETE /v1/files/{id}                        — Delete file
+  POST   /v1/files/bulk-delete                — Bulk delete files
+
+Document Parsing & Conversion:
+  POST   /v1/convert                          — Parse document to structured output
+  GET    /v1/convert/{request_id}             — Poll conversion result
+
+Document Segmentation:
+  POST   /v1/segment                          — Segment multi-document PDF
+  GET    /v1/segment/{request_id}             — Poll segmentation result
+
+Data Extraction & Annotations:
+  POST   /v1/extract                          — Structured field extraction
+  GET    /v1/extract/{request_id}             — Poll extraction result
+  POST   /v1/annotate                         — Per-image / document-level annotation
+
+Schemas:
+  POST   /v1/schemas                          — Create extraction schema
+  GET    /v1/schemas                           — List schemas
+  GET    /v1/schemas/{id}                     — Get schema
+  PUT    /v1/schemas/{id}                     — Update schema (create_new_version)
+  DELETE /v1/schemas/{id}                     — Delete schema (soft)
+  POST   /v1/gen-schemas                      — Auto-generate candidate schemas from checkpoint
+  GET    /v1/gen-schemas/{request_id}         — Poll schema generation
+
+Classification & Taxonomies:
+  GET    /v1/content-types                    — List content-type tree
+  POST   /v1/content-types                    — Action: adopt | define | undefine | define_attr | undefine_attr
+  GET    /v1/content-types/templates          — List seed templates
+  POST   /v1/files/{id}/facets                — Action: classify | unclassify | set_value | clear_value
+  GET    /v1/files/{id}/facets                — Get file classifications + attribute values
+  GET    /v1/tags                              — List tags
+  POST   /v1/tags                              — Create tag
+
+Embedding (Standalone):
+  POST   /v1/embeddings                       — Generate embeddings for arbitrary text
+
+Entity Resolution & Clustering:
+  POST   /v1/resolve                          — Entity deduplication
+  POST   /v1/equijoin                         — Fuzzy join
+  POST   /v1/cluster                          — Hierarchical clustering
+  POST   /v1/rank                             — Full sorting by latent attribute
+
+Knowledge Graph:
+  POST   /v1/knowledge-graph/build            — Build KG from document(s)
+  GET    /v1/knowledge-graph/{id}             — Get graph (NetworkX JSON, stats, provenance)
+  GET    /v1/knowledge-graph/{id}/export      — Export graph (csv/cypher/json/html)
+  GET    /v1/knowledge-graph/{id}/visualize   — Interactive HTML (Cytoscape/PyVis)
+  POST   /v1/visualize/embeddings             — t-SNE 2D visualization of embeddings
+
+Search & Retrieval:
+  POST   /v1/search                           — Unified search (semantic/keyword/hybrid/agentic/list)
+  POST   /v1/grep                             — Regex pattern matching
+  POST   /v1/list-chunks                      — Metadata-only retrieval
+  POST   /v1/metadata-facets                  — Aggregate chunk counts by metadata
+  POST   /v1/aggregate                        — Aggregate over collection or search results
+
+Answer Generation / RAG:
+  POST   /v1/ask                               — RAG: retrieve + generate (streaming-capable)
+  POST   /v1/generate                         — Generative search (single_prompt / grouped_task)
+
+Document Transformation:
+  POST   /v1/create-document                  — Generate DOCX from markdown (with track changes)
+  POST   /v1/fill                              — Fill PDF/image form
+  POST   /v1/track-changes                    — Extract redlines from DOCX
+  GET    /v1/thumbnails/{lookup_key}          — Page thumbnails
+
+Pipelines & Workflows:
+  POST   /v1/pipelines                        — Create pipeline (versioned)
+  GET    /v1/pipelines                        — List pipelines
+  GET    /v1/pipelines/{id}                   — Get pipeline (version)
+  POST   /v1/pipelines/{id}/run              — Execute pipeline
+  GET    /v1/pipelines/executions/{id}       — Get execution status + per-step results
+  GET    /v1/pipelines/executions            — List executions
+  POST   /v1/pipelines/{id}/optimize         — Offline MCTS optimization (MOAR)
+  POST   /v1/workflows                        — Create workflow definition (Temporal-style)
+  POST   /v1/workflows/{id}/execute          — Execute workflow
+  GET    /v1/workflows/{id}/execution        — Get execution status
+
+Custom Processors:
+  POST   /v1/custom-processors                — Create AI-generated custom processor
+  GET    /v1/custom-processors                — List
+  GET    /v1/custom-processors/{id}           — Get (with versions)
+  POST   /v1/custom-processors/{id}/iterate  — Iterate (new version)
+  POST   /v1/custom-processors/{id}/describe  — Conversational builder
+  POST   /v1/custom-processors/{id}/execute   — Execute custom processor
+  GET    /v1/custom-processors/{id}/pipelines — List pipelines using this processor
+
+Evaluation:
+  POST   /v1/eval-rubrics                     — Create eval rubric
+  POST   /v1/eval-rubrics/from-feedback       — Generate rubric from user feedback
+  POST   /v1/forge-evals                      — Configuration comparison
+  POST   /v1/validate                         — Validate extracted KVPs against ontology
+
+Query Agent (Agentic NL → Operations):
+  POST   /v1/query-agent/ask                  — Natural language → answer + sources
+  POST   /v1/query-agent/search               — Natural language → raw objects
+  POST   /v1/query-agent/ask-stream          — Streaming with progress
+
+MCP Server (AI Assistant Integration):
+  WS     /v1/mcp                              — MCP endpoint exposing tools (search, ask, convert, extract, graph_query)
+```
 
 ---
 
-## 5. Alternative-Approaches Cross-Reference Table
+## Conventions
 
-| Processing Step | Alternative Approaches |
-|---|---|
-| **File upload** | Multipart upload · URL-based · Base64 inline · Presigned-URL · Resumable/multipart · Cloud-storage loaders (S3/Azure/GCS/Drive/SharePoint) · Local FS/directory · In-memory/stream · Pre-chunked (MXJSON) · Docling JSON round-trip · `datalab://` references · JSON object insertion |
-| **Parsing** | Multi-model pipeline (layout+OCR+table) · Single end-to-end VLM · Native multimodal vision · Managed automatic · Dedicated OCR API · Word-level OCR with font metadata · Format-specific backends · Audio/video ASR · Legacy office conversion |
-| **Segmentation** | Schema-guided · Automatic boundary detection · Page-structure segmentation |
-| **Chunking** | Static/token-count · Character-count · Separator/hierarchical · Markdown/header-aware · Hierarchical/structure-pure · Hybrid/tokenization-aware · Line-based · Word-count with overlap · Structure-preserving · Automatic/managed · Pre-chunked (bypass) · Gather (context enrichment) |
-| **Chunk enrichment** | Summary enrichment · Contextualization at index time · Gather (context windows) · Generated metadata · Custom enrichers |
-| **Data extraction** | JSON-schema-driven LLM extraction · BBox annotation · Document annotation · KVP with ontology · Table/line-item extraction · Semantic normalization · Verbatim text extraction · Form filling · Schema auto-generation · Pydantic-template extraction · Dense extraction |
-| **Classification** | AI document classification · Hierarchical taxonomy (Facets) · Flat tags · Custom processor classification · LLM map with enum · Filter-based · Picture classification · Zero-shot via embeddings |
-| **Entity resolution** | Blocking+LLM comparison+union-find · Deterministic node ID registry · LLM entity standardization · Dense dedupe · Link resolve · Equijoin (fuzzy join) · Cross-references · BARGAIN cascade |
-| **Clustering** | Hierarchical agglomerative · KMeans · Louvain community detection · Value sampling cluster · t-SNE visualization |
-| **Embedding** | Auto-vectorization on insert · Managed automatic · Standalone embedding API · Configurable embedder · Named vectors (multi-model) · Multi-vector (ColBERT/ColPali) · Multimodal embeddings · Vision (VLM) embeddings · Whole-document embeddings · Self-provided vectors · Embeddings as ML features |
-| **Indexing** | Managed vector store · Self-hosted vector DB (HNSW/Flat/Dynamic/HFresh) · Vespa · LanceDB · Native graph DB · File-based · DPE database · S3 integration · BYOB |
-| **Search** | BM25/BM25F keyword · Grep regex · near_text/near_vector/near_object/near_image · Semantic via embeddings · Hybrid (alpha-weighted) · RRF · Hybrid vector+keyword+vision · Hybrid web+internal · Agentic search · Query Agent · Model-autonomous File Search · List chunks · Multi-store/federated · Cross-collection Explore · Cross-document reasoning |
-| **Filtering** | Comparison filters · Compound filters · AIP-160 expressions · Weaviate filter operators · Cross-reference filtering · Nested object filtering · Content-type/facet filters · Tag filters · File ID scoping |
-| **Reranking** | Cross-encoder (pointwise) · Listwise (instruction-steerable) · LLM reranking · RRF fusion · Relevance scoring modes · Sequential chaining · Boost (soft ranking) |
-| **Query rewriting** | Query rewriting (observable) · LLM query rewriter · LLM query extension (sub-queries) · Model-generated queries |
-| **Caching** | Semantic cache · Result caching · LLM call caching · Memoized terminal actions · Persistent media IDs · HNSW snapshots |
-| **RAG / QA** | Hosted RAG (model-autonomous) · Managed RAG (one-call) · Two-stage retrieve+generate · Generative search in search calls · Retrieval API + manual synthesis · Document QnA · RAG via retriever+map/reduce · GraphRAG · Query Agent Ask · Structured grounded output |
-| **Knowledge graph** | Schema-validated Pydantic pipeline · Schema-free LLM triple extraction · Native graph DB storage · Link resolve · Cross-references |
-| **Aggregation** | Aggregate queries · Grouped search (GroupBy) · Reduce operator · Facets · Rank operator |
-| **Document transformation** | DOCX generation · Form filling · Track changes extraction · Document round-trip · Thumbnails · Synthetic data generation |
-| **Orchestration** | Declarative pipelines (YAML/Python) · Temporal workflows · Declarative map-reduce framework · Pipeline + RoutedPipeline · QueryEngine + CachedQueryEngine · run_pipeline · MCP server · Automatic managed pipeline |
-| **Evaluation** | Parse quality score · Eval rubrics · Forge Evals · Custom processor evals · Per-field verification · Per-field confidence · KVP validation · Gleaning · Validate · Calibration · Plan rewrites · BARGAIN cascades · MOAR MCTS optimization · Operation-level optimize · Semantic cache metrics |
+### Authentication
+Bearer token via `Authorization: Bearer <key>`. Keys are scoped to a workspace and role (`owner`/`editor`/`viewer`). For self-hosted vectorizer/generator modules, model provider keys are passed via headers (`X-OPENAI-API-KEY`, `X-COHERE-API-KEY`, etc.).
+
+### Async Pattern
+Processing endpoints (`/convert`, `/extract`, `/segment`, `/gen-schemas`, `/create-document`, `/fill`, `/track-changes`, pipeline runs) are asynchronous: the initial `POST` returns `202` with a `request_id` + `request_check_url`. The client polls the check URL until `status` becomes terminal (`completed`/`embedded`/`success` or `failed`/`cancelled`). Alternatively, a `webhook_url` fires on completion.
+
+**Unified status lifecycle:**
+```
+pending → in_progress → completed | failed | cancelled
+```
+Index-time file ingestion adds intermediate states: `converting → parsing → embedding → embedded`.
+
+### Pagination
+List endpoints accept `limit` (default 50, max 100) and `offset`, or cursor-based pagination with `before`/`after` tokens.
+
+### Errors
+All errors return a JSON body:
+```json
+{
+  "error": { "code": "invalid_request", "message": "human-readable message" },
+  "request_id": "req_..."
+}
+```
+Common HTTP status codes: `400` invalid request, `401` unauthenticated, `403` forbidden, `404` not found, `409` conflict, `422` validation failed, `429` rate/budget limited (with `Retry-After`), `500`/`503` server errors.
 
 ---
 
-## 6. Unified API Specification
+## Unified Data Structures
 
-This section specifies a **super-complete API** that encompasses all features of the eleven surveyed systems. It is written for the end user — an API consumer who wants to build document-intelligence applications.
+### Workspace Object
 
-> **Conventions:** All endpoints are RESTful under a base URL `https://api.unified-docintel.example/v1`. Parameters shown in `monospace` are JSON body fields or query params. Async operations follow submit→poll/webhook→retrieve. The spec uses a unified naming; the naming-variant table above maps to individual systems.
-
-### 6.1 Authentication & Configuration
-
-```
-POST   /v1/api-keys                  — Create scoped API key (roles: owner/editor/viewer; workspace-scoped)
-GET    /v1/api-keys                  — List API keys
-DELETE /v1/api-keys/{id}             — Revoke API key
-GET    /v1/health                    — Health check (no auth)
-GET    /v1/version                   — Version info
-```
-
-**Auth:** Bearer token (`Authorization: Bearer <key>`). Model provider keys passed via headers (`X-OPENAI-API-KEY`, `X-COHERE-API-KEY`, etc.) for self-hosted vectorizer/generator modules.
-
-**Budget:**
-```
-GET    /v1/budgets                   — Get org budget
-PATCH  /v1/budgets                   — Update monthly cap + alert thresholds
+```json
+{
+  "id": "ws_abc123",
+  "name": "Contracts 2026",
+  "type": "shared | personal",
+  "processing_location": "us | eu",
+  "embedding_model": "text-embedding-3-large",
+  "chunking_config": { "type": "hybrid", "max_chunk_size_tokens": 800, "chunk_overlap_tokens": 400 },
+  "contextualization": { "with_metadata": true, "with_file_context": false },
+  "expires_after": { "anchor": "last_active_at", "days": 30 },
+  "access_mode": "private | public",
+  "multi_tenancy": false,
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601"
+}
 ```
 
-### 6.2 Workspaces (Containers)
+| Field | Type | Values/Default | Description | Source |
+|-------|------|----------------|-------------|--------|
+| `type` | string | `shared`/`personal` | Isolation mode | lighton |
+| `processing_location` | string | `us`/`eu` | Data residency (EU may carry premium) | datalab |
+| `embedding_model` | string | model id | Text-only or multimodal; may be immutable after creation | google, openai |
+| `chunking_config` | object | see ChunkingConfig | Default chunking for files in this workspace | google, openai, mixedbread |
+| `contextualization` | object | `{with_metadata, with_file_context}` | Index-time chunk enrichment | mixedbread |
+| `expires_after` | object | `{anchor, days}` | Auto-expire dormant stores | openai, mixedbread |
+| `multi_tenancy` | boolean | false | Enable per-tenant sharding | weaviate |
 
-A **Workspace** is the top-level container for documents, indexes, and tenants.
+### ChunkingConfig Object
 
-```
-POST   /v1/workspaces                — Create workspace
-         { name, type: "shared"|"personal", processing_location: "us"|"eu",
-           embedding_model, chunking_config, expires_after: {anchor, days} }
-GET    /v1/workspaces                — List workspaces (pagination: limit, before/after)
-GET    /v1/workspaces/{id}           — Get workspace
-PUT    /v1/workspaces/{id}           — Update workspace
-DELETE /v1/workspaces/{id}           — Delete workspace (cascade with force: true)
-```
-
-**Workspace config:**
-- `embedding_model` — text-only or multimodal (immutable after creation for some systems).
-- `chunking_config` — `{ type: "static"|"hierarchical"|"hybrid"|"line_based"|"markdown"|"separator", max_chunk_size_tokens, chunk_overlap_tokens, tokenizer, merge_peers, repeat_table_header, ... }`.
-- `contextualization` — `{ with_metadata: bool, with_file_context: bool }`.
-- `expires_after` — `{ anchor: "last_active_at", days: N }`.
-- `access_mode` — `private` | `public`.
-
-### 6.3 Files (Upload & Ingestion)
-
-```
-POST   /v1/files                     — Upload file (multipart) or by URL or base64
-         { file | file_url | base64_string, filename, title, workspace_id,
-           metadata, external_id, tags[], parser, parsing_strategy,
-           chunking_strategy, processing_location, webhook_url,
-           auto_chunk: true, save_checkpoint: true }
-GET    /v1/files                     — List files (filter by workspace_id, status, tags, metadata)
-GET    /v1/files/{id}                — Get file metadata + status
-GET    /v1/files/{id}/download       — Download original or rendered_pdf (purpose param)
-PATCH  /v1/files/{id}                — Update file metadata/attributes
-DELETE /v1/files/{id}                — Delete file
-POST   /v1/files/bulk-delete         — Bulk delete
+```json
+{
+  "type": "static | hierarchical | hybrid | line_based | markdown | separator",
+  "max_chunk_size_tokens": 800,
+  "chunk_overlap_tokens": 400,
+  "tokenizer": "tiktoken-cl100k",
+  "merge_peers": true,
+  "merge_list_items": true,
+  "repeat_table_header": true,
+  "omit_header_on_overflow": false,
+  "keep_separator": true,
+  "strip_whitespace": false,
+  "headers_to_split_on": ["#", "##"],
+  "num_splits_to_group": 1
+}
 ```
 
-**Presigned / multipart upload:**
-```
-POST   /v1/files/uploads             — Create multipart upload session
-         { filename, file_size, mime_type, part_count }
-GET    /v1/files/uploads/{id}        — Get upload status + fresh presigned URLs
-POST   /v1/files/uploads/{id}/abort  — Abort upload
-POST   /v1/files/uploads/{id}/complete — Complete upload (parts + ETags)
-```
+| Field | Type | Default | Description | Source |
+|-------|------|---------|-------------|--------|
+| `type` | string | `hybrid` | Chunking strategy (see C1 alternatives) | all |
+| `max_chunk_size_tokens` | int | 800 | Max tokens per chunk (100–4096) | openai, google, docling |
+| `chunk_overlap_tokens` | int | 400 | Overlap between adjacent chunks | openai, google |
+| `tokenizer` | string | — | Tokenizer for alignment | docling, mistral |
+| `merge_peers` | boolean | true | Merge undersized adjacent chunks | docling |
+| `merge_list_items` | boolean | true | Merge list items into one chunk | docling |
+| `repeat_table_header` | boolean | true | Repeat table header on each chunk | docling |
+| `headers_to_split_on` | string[] | — | Markdown headers to split on | mistral |
 
-**File status lifecycle:** `pending → converting → parsing → embedding → embedded | failed`
+### File Object
 
-**Webhooks:** `webhook_url` per request or default in account settings. Webhook fires on status change.
-
-**Idempotent uploads:** `external_id` with slash support for path-like identifiers; re-upload returns existing doc (200) instead of duplicating.
-
-### 6.4 Document Parsing & Conversion
-
-```
-POST   /v1/convert                   — Parse document to structured output
-         { file | file_url | checkpoint_id, output_format: ["md"|"html"|"json"|"chunks"|"doctags"|"doclang"|"docx"|"pdf"|"png"],
-           mode: "fast"|"balanced"|"accurate",
-           page_range, max_pages, paginate, add_block_ids, word_bboxes,
-           table_cell_bboxes, list_item_bboxes, include_markdown_in_chunks,
-           disable_image_extraction, disable_image_captions,
-           do_ocr, force_ocr, ocr_lang, ocr_preset, table_mode, table_format,
-           include_image_base64, include_blocks, confidence_scores_granularity,
-           bbox_annotation_format, document_annotation_format,
-           extract_header, extract_footer, extract_links,
-           save_checkpoint, skip_cache, processing_location,
-           extras: ["track_changes","chart_understanding","infographic","new_block_types"],
-           enrichments: ["code","formula","picture_classification","picture_description"],
-           media_resolution: "low"|"medium"|"high",
-           additional_config: { keep_pageheader_in_output, keep_pagefooter_in_output, keep_spreadsheet_formatting },
-           webhook_url }
-GET    /v1/convert/{request_id}      — Poll conversion result
+```json
+{
+  "id": "file_123",
+  "external_id": "invoices/2026/001",
+  "filename": "invoice_jan.pdf",
+  "title": "January Invoice",
+  "mime_type": "application/pdf",
+  "size_bytes": 1048576,
+  "workspace_id": "ws_abc123",
+  "status": "pending | converting | parsing | embedding | embedded | failed",
+  "metadata": { "author": "Acme Corp", "year": 2026 },
+  "tags": ["tag_id_1", "tag_id_2"],
+  "content_types": ["invoice"],
+  "parser": "fast",
+  "processing_location": "us",
+  "page_count": 12,
+  "parse_quality_score": 4.2,
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601"
+}
 ```
 
-**Output:** markdown, html, json (blocks with bboxes/types), chunks, images (base64), metadata, page_count, parse_quality_score (0–5), cost_breakdown, checkpoint_id, confidence_scores.
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `external_id` | string | Idempotent ID; re-upload returns existing doc (slash-supported paths) | lighton, mixedbread |
+| `status` | string | Ingestion lifecycle state | all |
+| `metadata` | object | User file metadata (bare keys); max 16 keys, 256 chars each | openai, mixedbread |
+| `tags` | string[] | Flat tag IDs | lighton |
+| `parser` | string | Ingestion pipeline version/strategy (`fast`) | lighton, mixedbread |
+| `parse_quality_score` | number | 0–5 self-assessment of conversion quality | datalab |
 
-**Checkpoint reuse:** `checkpoint_id` from a prior `save_checkpoint=true` conversion can be passed to `/convert`, `/extract`, `/segment`, `/gen-schemas` to skip re-parsing.
+### Chunk Object
 
-### 6.5 Document Segmentation
-
-```
-POST   /v1/segment                   — Segment multi-document PDF
-         { file | file_url | checkpoint_id,
-           segmentation_schema: { segments: [{name, description}], segmentation_strategy: "custom"|"document_boundary" },
-           mode, page_range, save_checkpoint, webhook_url }
-GET    /v1/segment/{request_id}      — Poll segmentation result
-```
-
-**Output:** `segments[]` with name, pages[], confidence (`high`/`medium`/`low`).
-
-### 6.6 Chunking
-
-Chunking is configured at the workspace level (`chunking_config`) or per-file (`chunking_strategy`). The API exposes chunk inspection:
-
-```
-GET    /v1/files/{id}/chunks         — List chunks (return_chunks: bool | indices[])
-```
-
-**Chunk types:** `text`, `image_url`, `audio_url`, `video_url`, `content`, `image_annotation`, `summary`.
-
-**Pre-chunked ingestion (bypass parsing):**
-```
-POST   /v1/files/prechunked          — Upload MXJSON/MXJSONL
-         { file (json with chunks[]), workspace_id, metadata, external_id }
-```
-
-### 6.7 Data Extraction
-
-```
-POST   /v1/extract                   — Structured field extraction
-         { file | file_url | checkpoint_id,
-           page_schema (JSON Schema) | schema_id,
-           schema_version,
-           extraction_mode: "turbo"|"fast"|"balanced",
-           mode (parsing): "fast"|"balanced"|"accurate",
-           output_format, page_range, save_checkpoint, skip_cache, webhook_url }
-GET    /v1/extract/{request_id}      — Poll extraction result
+```json
+{
+  "chunk_id": "chk_001",
+  "chunk_index": 0,
+  "type": "text | image_url | audio_url | video_url | content | image_annotation | summary",
+  "content": "...chunk text...",
+  "text_hash": "sha256:...",
+  "token_count": 642,
+  "char_length": 2103,
+  "page_number": 1,
+  "page_start": 1,
+  "page_end": 2,
+  "total_pages": 12,
+  "start_offset": 0,
+  "end_offset": 2103,
+  "headings": ["Introduction", "Scope"],
+  "images": ["img_id_1"],
+  "locator": "page:1:char:0-2103",
+  "filename": "invoice_jan.pdf",
+  "file_id": "file_123",
+  "title": "January Invoice",
+  "mime_type": "application/pdf",
+  "generated_metadata": { "language": "en", "word_count": 312 },
+  "embedding": { "model": "text-embedding-3-large", "dimensions": 3072 }
+}
 ```
 
-**Output:** per-field values, `{field}_citations`, `{field}_meta` (extraction_status, reasoning, verification status, citations), `{field}_score` (1–5), `extraction_score_average`.
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `locator` | string | `char:{s}-{e}`, `page:{n}:char:{s}-{e}`, `summary:char:0-512` | mistral |
+| `generated_metadata` | object | Auto-extracted typed metadata (`generated_metadata.` prefix) | mixedbread |
+| `headings` | string[] | Reconstructed header hierarchy for context | mistral, docetl |
+| `embedding` | object | Model + dimensions used to embed this chunk | weaviate, openai |
 
-**Schema management:**
-```
-POST   /v1/schemas                   — Create extraction schema
-GET    /v1/schemas                   — List schemas
-GET    /v1/schemas/{id}              — Get schema
-PUT    /v1/schemas/{id}              — Update schema (create_new_version)
-DELETE /v1/schemas/{id}              — Delete schema (soft)
-POST   /v1/gen-schemas               — Auto-generate candidate schemas from checkpoint
-         { checkpoint_id }
-GET    /v1/gen-schemas/{request_id}  — Poll (returns simple/moderate/complex schemas)
-```
+### Embedding Request / Response
 
-**Annotations (BBox / Document):**
-```
-POST   /v1/annotate                  — Per-image or document-level annotation
-         { file | file_url, bbox_annotation_format | document_annotation_format (JSON Schema/Pydantic/Zod),
-           include_image_base64, webhook_url }
+```json
+// Request
+{ "input": "string or string[]", "model": "text-embedding-3-large",
+  "dimensions": 1536, "encoding_format": "float | base64" }
+
+// Response
+{ "data": [ { "embedding": [0.0123, ...], "index": 0 } ],
+  "usage": { "prompt_tokens": 12, "total_tokens": 12 } }
 ```
 
-### 6.8 Classification & Taxonomies (Facets)
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `dimensions` | int | MRL shortening (≤ model max) | openai |
+| `encoding_format` | string | `float`/`base64` | openai |
+| `model` | string | e.g. `text-embedding-3-small` (1536d), `text-embedding-3-large` (3072d), `gemini-embedding-2` (multimodal), `mxbai-wholembed-v3` (whole-doc) | openai, google, mixedbread |
 
-```
-GET    /v1/content-types             — List content-type tree (filters: query, path, depth, include_attributes)
-POST   /v1/content-types             — Action-dispatched: adopt | define_content_type | undefine_content_type | define_attribute | undefine_attribute
-GET    /v1/content-types/templates   — List seed templates (finance, healthcare, legal, manufacturing, tech)
-POST   /v1/files/{id}/facets         — Action-dispatched: classify | unclassify | set_value | clear_value
-GET    /v1/files/{id}/facets         — Get file classifications + attribute values
-```
+### Schema Object
 
-**Tags:**
-```
-GET    /v1/tags                      — List tags
-POST   /v1/tags                      — Create tag
-```
-
-### 6.9 Entity Resolution, Clustering & Knowledge Graph
-
-These are exposed as **pipeline operators** (see §6.12) and as **standalone endpoints**:
-
-```
-POST   /v1/resolve                   — Entity deduplication
-         { data, comparison_prompt, resolution_prompt, blocking_keys, blocking_threshold,
-           blocking_target_recall, blocking_conditions, embedding_model, cascade }
-POST   /v1/equijoin                  — Fuzzy join
-         { left, right, comparison_prompt, limits, blocking_keys, blocking_threshold, cascade }
-POST   /v1/cluster                   — Hierarchical clustering
-         { data, embedding_keys, summary_prompt, summary_schema, embedding_model }
-POST   /v1/rank                      — Full sorting by latent attribute
-         { data, prompt, input_keys, direction: "asc"|"desc", initial_ordering_method: "likert"|"embedding",
-           call_budget, k }
+```json
+{
+  "schema_id": "sch_k8Hx9mP2nQ4v",
+  "name": "Invoice fields",
+  "description": "Standard invoice extraction schema",
+  "schema_json": { "properties": { "invoice_number": {"type": "string"}, "total": {"type": "number"} } },
+  "version": 2,
+  "version_history": [ {"version": 1, "schema_json": {...}} ],
+  "archived": false,
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601"
+}
 ```
 
-**Knowledge graph building:**
-```
-POST   /v1/knowledge-graph/build     — Build KG from document(s)
-         { source | file_id | checkpoint_id,
-           template (Pydantic class or dotted path),
-           processing_mode: "one-to-one"|"many-to-one",
-           extraction_contract: "auto"|"direct"|"dense",
-           dense_config: { skeleton_batch_tokens, fill_nodes_cap, fill_context, dedupe },
-           backend: "llm"|"vlm", inference: "local"|"remote",
-           use_chunking, chunk_max_tokens,
-           provenance: "off"|"standard"|"detailed",
-           gleaning_enabled, parallel_workers,
-           export_format: "csv"|"cypher"|"json"|"html",
-           export_docling, export_markdown, export_doclang }
-GET    /v1/knowledge-graph/{id}      — Get graph (NetworkX JSON, stats, provenance)
-GET    /v1/knowledge-graph/{id}/export — Export graph (csv/cypher/json/html)
-```
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `schema_id` | string | Stable ID; mutually exclusive with inline `page_schema` on `/extract` | datalab |
+| `version` | int | Current version (starts at 1); pin with `schema_version` | datalab |
+| `archived` | boolean | Soft-delete flag | datalab |
 
-### 6.10 Embedding (Standalone)
-
-```
-POST   /v1/embeddings                — Generate embeddings for arbitrary text
-         { input (string | string[]), model, dimensions, encoding_format: "float"|"base64" }
-```
-
-**Output:** `data[]` with `embedding[]`, `index`; `usage` (prompt_tokens, total_tokens).
-
-### 6.11 Index & Search
-
-#### Index management
-Handled by workspace creation (§6.2). Additional:
-
-```
-GET    /v1/workspaces/{id}/documents          — List indexed documents
-GET    /v1/workspaces/{id}/documents/{doc_id} — Get indexed document
-DELETE /v1/workspaces/{id}/documents/{doc_id} — Delete indexed document (cascade to embeddings)
-```
-
-#### Search
-
-```
-POST   /v1/search                    — Unified search
-         { query, workspace_id[] | store_identifiers[], top_k, max_results,
-           mode: "text"|"vision",
-           search_type: "semantic"|"keyword"|"hybrid"|"agentic"|"grep"|"list",
-           alpha (hybrid: 0=keyword, 1=vector),
-           fusion_type: "relative_score"|"ranked",
-           hybrid_search: { embedding_weight, text_weight },
-           ranking_options: { ranker, score_threshold },
-           rerank: bool | { model, top_k, with_metadata },
-           rewrite_query: bool,
-           agentic: bool | { max_rounds, queries_per_round, instructions, strict_top_k },
-           relevance_scoring: "none"|"scoring_only"|"scoring_and_filtering",
-           filters: { ... } | attribute_filter | metadata_filter (AIP-160),
-           content_type[], attribute[], tag_id[], file_ids[],
-           target_vector, distance, certainty, auto_limit, autocut,
-           move_to: { concepts, force }, move_away: { concepts, force },
-           selection: { type: "mmr", balance },
-           boost: { ... },
-           group_by: { prop, objects_per_group, number_of_groups },
-           return_properties, return_references, return_metadata,
-           include_image, include_bboxes, media_content: "auto"|"always"|"never",
-           return_metadata: bool }
-```
-
-**Grep (regex):**
-```
-POST   /v1/grep                      — Regex pattern matching
-         { store_identifiers[], pattern (RE2), top_k, content_groups: ["text"|"generated"],
-           case_sensitive, file_ids[], filters, return_metadata }
-```
-
-**List chunks (metadata-only):**
-```
-POST   /v1/list-chunks               — Metadata-only retrieval
-         { store_identifiers[], top_k, file_ids[], sort_by, filters, return_metadata }
-```
-
-**Facets:**
-```
-POST   /v1/metadata-facets           — Aggregate chunk counts by metadata
-         { store_identifiers[], query, top_k, filters, facets[] }
-```
-
-#### Filtering language (unified)
+### Filter (Unified)
 
 ```jsonc
 // Comparison filter
@@ -1218,157 +1292,556 @@ POST   /v1/metadata-facets           — Aggregate chunk counts by metadata
 { "type": "eq", "property": "filename", "value": "invoice.pdf" }
 
 // AIP-160 string (google-style)
-metadata_filter: "author=\"Robert Graves\" AND year>=1934"
+{ "metadata_filter": "author=\"Robert Graves\" AND year>=1934" }
 ```
 
-**Three metadata layers:** User file metadata (bare keys), generated chunk metadata (`generated_metadata.` prefix), system fields (`file_id`, `chunk_index`). Dot notation for nested fields.
+**Three metadata layers:** User file metadata (bare keys), generated chunk metadata (`generated_metadata.` prefix), system fields (`file_id`, `chunk_index`). Dot notation for nested fields. Comparison operators: `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `nin`, `like`, `not_like`. Compound operators: `and`, `or`, `all` (AND), `any` (OR), `none` (NOT).
 
-### 6.12 Answer Generation / RAG / QA
+### Citation Object
 
-```
-POST   /v1/ask                       — RAG: retrieve + generate
-         { query | messages[], workspace_id[] | store_identifiers[],
-           model, max_results, stream: bool,
-           instructions (answer-style steering),
-           qa_options: { cite: bool, multimodal: bool, stream: bool },
-           search_options: { rerank, rewrite_query, agentic, score_threshold, ... },
-           filters, content_type[], attribute[], tag_id[], file_ids[] }
-```
-
-**Output (non-streaming):** `{ answer (with <cite i="n"/> markers), sources: [chunks] }`.
-
-**Output (streaming):** SSE token events + final answer object (OpenAI-compatible).
-
-**Generative search modes (weaviate-style):**
-```
-POST   /v1/generate                  — Generative search with single_prompt / grouped_task
-         { query, workspace_id, search_type, top_k,
-           single_prompt, grouped_task, grouped_properties,
-           generative_provider (query-time model override) }
+```json
+{
+  "type": "file_citation | block_id | cite_marker | chunk_ref | provenance",
+  "file_id": "file_123",
+  "file_name": "invoice_jan.pdf",
+  "page_number": 2,
+  "page_start": 1,
+  "page_end": 3,
+  "block_id": "/page/2/Text/3",
+  "char_start": 450,
+  "char_end": 510,
+  "media_id": "img_id_1",
+  "bbox": [120, 240, 400, 280],
+  "index": 3,
+  "custom_metadata": {}
+}
 ```
 
-**Structured grounded output (google-style):**
-```
-POST   /v1/ask                       — with response_format
-         { ..., response_format: { type: "text", mime_type: "application/json", schema: {...} } }
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `block_id` | string | `/page/0/Text/3` style location | datalab |
+| `file_citation` fields | — | `file_name`, `page_number`, `media_id`, `custom_metadata` | google, openai |
+| `char_start`/`char_end` | int | Inline character offsets | openai |
+| `index` | int | `<cite i="n"/>` marker index → `sources[n]` | mixedbread |
+| `bbox` | number[] | Bounding box for UI highlighting | lighton |
+
+### SearchResultItem
+
+```json
+{
+  "chunk_id": "chk_001",
+  "content": "...",
+  "score": 0.92,
+  "score_breakdown": { "text": 0.88, "vision": 0.0, "keyword": 0.4, "relevance": 0.92 },
+  "file_id": "file_123",
+  "filename": "invoice_jan.pdf",
+  "page_number": 2,
+  "bbox": [120, 240, 400, 280],
+  "metadata": { "author": "Acme Corp" },
+  "media_url": "https://...",
+  "citation": { "type": "file_citation", "page_number": 2, "block_id": "/page/2/Text/3" }
+}
 ```
 
-### 6.13 Aggregations & Analytics
+| Field | Type | Description | Source |
+|-------|------|-------------|--------|
+| `score_breakdown` | object | Per-component scores (text/vision/keyword/multivector/relevance) | lighton |
+| `bbox` | number[] | Merged PDF cell bboxes for UI highlighting | lighton |
+| `media_url` | string | Downloadable media for image chunks | google |
 
-```
-POST   /v1/aggregate                 — Aggregate over collection or search results
-         { workspace_id, query (optional, for search-time aggregate),
-           total_count: bool, return_metrics: Metrics, group_by: GroupByAggregate,
-           filters, distance, object_limit }
-```
+---
 
-**Metrics:** `count`, `sum`, `max`, `min`, `mean`, `median`, `mode`, `top_occurrences`, `percentageTrue/False`, `reference_count`.
+## Endpoint Specifications
 
-### 6.14 Document Transformation
+### Workspaces
 
+**Create workspace** — `POST /v1/workspaces`
+```json
+{ "name": "Contracts 2026", "type": "shared", "processing_location": "us",
+  "embedding_model": "text-embedding-3-large",
+  "chunking_config": { "type": "hybrid", "max_chunk_size_tokens": 800, "chunk_overlap_tokens": 400 },
+  "contextualization": { "with_metadata": true, "with_file_context": false },
+  "expires_after": { "anchor": "last_active_at", "days": 30 },
+  "multi_tenancy": false }
 ```
-POST   /v1/create-document           — Generate DOCX from markdown
-         { markdown (with <ins>/<~~>/<comment> tags), output_format: "docx", webhook_url }
-POST   /v1/fill                      — Fill PDF/image form
-         { file | file_url, field_data: {key: {value, description}}, context,
-           confidence_threshold, page_range, output_format: "pdf"|"png" }
-POST   /v1/track-changes             — Extract redlines from DOCX
-         { file | file_url, output_format: ["md"|"html"|"chunks"], page_range, webhook_url }
-GET    /v1/thumbnails/{lookup_key}   — Page thumbnails
-         { page_range, thumb_width, track_changes: bool }
-```
+Returns `201` with a Workspace Object.
 
-### 6.15 Pipelines & Workflows (Orchestration)
+**List workspaces** — `GET /v1/workspaces?limit=50&before=cursor`
 
-```
-POST   /v1/pipelines                 — Create pipeline (versioned)
-         { name, steps: [ { type: "convert"|"segment"|"extract"|"custom"|"fill"|"map"|"filter"|"reduce"|"resolve"|"cluster"|"rank"|"split"|"gather"|"unnest"|"code_map"|"code_reduce"|"code_filter"|"parallel_map"|"equijoin"|"link_resolve"|"kg_build",
-                            settings: {...}, custom_processor_id, eval_rubric_id } ] }
-GET    /v1/pipelines                 — List pipelines
-GET    /v1/pipelines/{id}            — Get pipeline (version)
-POST   /v1/pipelines/{id}/run        — Execute pipeline
-         { file | file_url, version (0=draft, omit=active), page_range, output_format,
-           run_evals, skip_cache, checkpoint_id, webhook_url }
-GET    /v1/pipelines/executions/{id} — Get execution status + per-step results
-GET    /v1/pipelines/executions      — List executions
-```
+---
 
-**Custom processors:**
-```
-POST   /v1/custom-processors         — Create AI-generated custom processor
-GET    /v1/custom-processors         — List
-GET    /v1/custom-processors/{id}    — Get (with versions)
-POST   /v1/custom-processors/{id}/iterate — Iterate (new version)
-POST   /v1/custom-processors/{id}/describe — Conversational builder
-```
+### Files
 
-**Workflows (Temporal-style):**
+**Upload file** — `POST /v1/files` (multipart)
 ```
-POST   /v1/workflows                 — Create workflow definition
-POST   /v1/workflows/{id}/execute    — Execute workflow
-GET    /v1/workflows/{id}/execution  — Get execution status
-GET    /v1/workflows/step-types      — List available step types
+file (binary) | file_url (string) | base64_string (string)
+filename, title, workspace_id, metadata, external_id, tags[], parser,
+parsing_strategy, chunking_strategy, processing_location, webhook_url,
+auto_chunk=true, save_checkpoint=true, purpose="assistants"
+```
+Returns `202` with `{ id, status: "pending", request_check_url }`.
+
+**Resumable/multipart upload:**
+- `POST /v1/files/uploads` → `{ upload_id, presigned_urls[], expires_in }`
+- `POST /v1/files/uploads/{id}/complete` with parts + ETags → finalizes
+- `POST /v1/files/uploads/{id}/abort`
+
+**Pre-chunked ingestion** — `POST /v1/files/prechunked`
+```json
+{ "file": { "chunks": [{"content": "...", "metadata": {}}] },
+  "workspace_id": "ws_abc123", "metadata": {}, "external_id": "docs/x" }
 ```
 
-### 6.16 Evaluation & Optimization
+**List chunks of a file** — `GET /v1/files/{id}/chunks?return_chunks=true&indices=[]`
 
+---
+
+### Document Parsing & Conversion
+
+**Convert document** — `POST /v1/convert`
+```json
+{
+  "file": "binary | file_url | checkpoint_id",
+  "output_format": "md | html | json | chunks | doctags | doclang | docx | pdf | png",
+  "mode": "fast | balanced | accurate",
+  "page_range": "0,5-10,20",
+  "max_pages": 100,
+  "paginate": false,
+  "add_block_ids": false,
+  "word_bboxes": false,
+  "table_cell_bboxes": false,
+  "list_item_bboxes": false,
+  "include_markdown_in_chunks": false,
+  "disable_image_extraction": false,
+  "disable_image_captions": false,
+  "do_ocr": true,
+  "force_ocr": false,
+  "ocr_lang": "en",
+  "ocr_preset": "default",
+  "table_mode": "fast | accurate",
+  "table_format": "markdown | html | none",
+  "include_image_base64": false,
+  "include_blocks": false,
+  "confidence_scores_granularity": "page | word | none",
+  "bbox_annotation_format": {},
+  "document_annotation_format": {},
+  "extract_header": false,
+  "extract_footer": false,
+  "extract_links": false,
+  "save_checkpoint": false,
+  "skip_cache": false,
+  "processing_location": "us | eu",
+  "extras": ["track_changes", "chart_understanding", "infographic", "new_block_types"],
+  "enrichments": ["code", "formula", "picture_classification", "picture_description"],
+  "media_resolution": "low | medium | high",
+  "additional_config": { "keep_pageheader_in_output": false, "keep_pagefooter_in_output": false, "keep_spreadsheet_formatting": false },
+  "webhook_url": "https://...",
+  "eval_rubric_id": null
+}
 ```
-POST   /v1/eval-rubrics              — Create eval rubric
-POST   /v1/eval-rubrics/from-feedback — Generate rubric from user feedback
-POST   /v1/forge-evals               — Configuration comparison (max 10 docs, 5 configs, 3 iterations)
-POST   /v1/validate                  — Validate extracted KVPs against ontology
-         { project_id, data (verbose JSON output) }
+Returns `202` with `{ request_id, request_check_url }`.
+
+**Poll result** — `GET /v1/convert/{request_id}` → `200` when complete:
+```json
+{
+  "status": "completed",
+  "success": true,
+  "output_format": "markdown",
+  "markdown": "...",
+  "html": null,
+  "json": null,
+  "chunks": null,
+  "images": { "img_1": "base64..." },
+  "metadata": {},
+  "page_count": 12,
+  "parse_quality_score": 4.2,
+  "cost_breakdown": {},
+  "checkpoint_id": "chk_abc",
+  "runtime": 8.3,
+  "result_url": "https://...",
+  "expires_in": 3600,
+  "evaluation": null
+}
 ```
 
-**Pipeline optimization (MOAR-style):**
+**Checkpoint reuse:** `checkpoint_id` from a prior `save_checkpoint=true` conversion can be passed to `/convert`, `/extract`, `/segment`, `/gen-schemas` to skip re-parsing.
+
+---
+
+### Document Segmentation
+
+**Segment document** — `POST /v1/segment`
+```json
+{
+  "file": "binary | file_url | checkpoint_id",
+  "segmentation_schema": { "segments": [{"name": "Invoice", "description": "..."}], "segmentation_strategy": "custom | document_boundary" },
+  "mode": "fast",
+  "page_range": "0,5-10,20",
+  "save_checkpoint": false,
+  "skip_cache": false,
+  "webhook_url": "https://..."
+}
 ```
-POST   /v1/pipelines/{id}/optimize   — Offline MCTS optimization
-         { eval_fn, metric_key, models, max_iterations, save_dir }
+**Output:**
+```json
+{ "segmentation_results": { "segments": [
+  {"name": "Invoice", "pages": [0,1,2], "confidence": "high"},
+  {"name": "Receipt", "pages": [3,4], "confidence": "medium"}
+], "metadata": {"total_pages": 5, "segmentation_method": "auto_detected"} } }
 ```
 
+---
+
+### Data Extraction
+
+**Extract structured fields** — `POST /v1/extract`
+```json
+{
+  "file": "binary | file_url | checkpoint_id",
+  "page_schema": {} | "schema_id": "sch_...",
+  "schema_version": 2,
+  "extraction_mode": "turbo | fast | balanced",
+  "mode": "fast | balanced | accurate",
+  "output_format": "markdown",
+  "page_range": "0,5-10,20",
+  "save_checkpoint": false,
+  "skip_cache": false,
+  "webhook_url": "https://...",
+  "docClass": "invoice",
+  "jsonOptions": "KVP,SN,MT,CHAR"
+}
+```
+**Output (balanced mode):**
+```json
+{
+  "company_name": "Whitbread PLC",
+  "company_name_citations": ["/page/0/Text/3", "/page/2/Table/1"],
+  "company_name_meta": {
+    "extraction_status": "EXTRACTED | NOT_RESOLVABLE",
+    "reasoning": "The company name appears...",
+    "citations": ["/page/0/Text/3"],
+    "verification": { "status": "PASS | FAIL_UNRESOLVABLE | FAIL_FIX | FAIL_CITATIONS | ITEMS_MISSING", "feedback": "..." }
+  },
+  "extraction_score_average": 4.5
+}
+```
+**Output (fast mode):**
+```json
+{
+  "invoice_number": "INV-2024-001",
+  "invoice_number_citations": ["block_123"],
+  "invoice_number_score": { "score": 5, "reasoning": "Value found verbatim..." },
+  "extraction_score_average": 4.5
+}
+```
+
+**Annotations** — `POST /v1/annotate`
+```json
+{ "file": "binary | file_url",
+  "bbox_annotation_format": {} | "document_annotation_format": {},
+  "include_image_base64": false, "webhook_url": "..." }
+```
+
+**Schema auto-generation** — `POST /v1/gen-schemas` with `{ checkpoint_id }` → returns `simple_schema`, `moderate_schema`, `complex_schema`.
+
+---
+
+### Classification & Taxonomies
+
+**Content-type tree** — `GET /v1/content-types?query=&path=&depth=4&include_attributes=true`
+**Actions** — `POST /v1/content-types` with `{ action: "adopt | define_content_type | undefine_content_type | define_attribute | undefine_attribute", ... }`
+**File facet actions** — `POST /v1/files/{id}/facets` with `{ action: "classify | unclassify | set_value | clear_value", content_type_path, attribute_name, value }`
+
+---
+
+### Embedding (Standalone)
+
+`POST /v1/embeddings` with Embedding Request → Embedding Response (see Unified Data Structures).
+
+---
+
+### Entity Resolution & Clustering
+
+**Resolve** — `POST /v1/resolve`
+```json
+{ "data": [], "comparison_prompt": "...", "resolution_prompt": "...",
+  "blocking_keys": [], "blocking_threshold": 0.8, "blocking_target_recall": 0.95,
+  "blocking_conditions": [], "embedding_model": "...", "cascade": {"proxy_model": "...", "guarantee": "recall", "target": 0.95, "delta": 0.05} }
+```
+**Equijoin** — `POST /v1/equijoin` with `{ left, right, comparison_prompt, limits, blocking_keys, blocking_threshold, cascade }`
+**Cluster** — `POST /v1/cluster` with `{ data, embedding_keys, summary_prompt, summary_schema, embedding_model }`
+**Rank** — `POST /v1/rank` with `{ data, prompt, input_keys, direction: "asc|desc", initial_ordering_method: "likert|embedding", call_budget, k }`
+
+---
+
+### Knowledge Graph
+
+**Build KG** — `POST /v1/knowledge-graph/build`
+```json
+{
+  "source": "file_id | checkpoint_id",
+  "template": "Pydantic class or dotted path",
+  "processing_mode": "one-to-one | many-to-one",
+  "extraction_contract": "auto | direct | dense",
+  "dense_config": { "skeleton_batch_tokens": 8000, "fill_nodes_cap": 50, "fill_context": "...", "dedupe": "standard" },
+  "backend": "llm | vlm",
+  "inference": "local | remote",
+  "use_chunking": true,
+  "chunk_max_tokens": 800,
+  "provenance": "off | standard | detailed",
+  "gleaning_enabled": false,
+  "parallel_workers": 4,
+  "export_format": "csv | cypher | json | html",
+  "export_docling": false,
+  "export_markdown": false,
+  "export_doclang": false
+}
+```
+**Output:** `{ graph_id, node_count, edge_count, node_types, edge_types, avg_degree, density, provenance_ledger, bind_stats }`
+
+**Export** — `GET /v1/knowledge-graph/{id}/export?format=cypher`
+**Visualize** — `GET /v1/knowledge-graph/{id}/visualize` → interactive HTML
+
+---
+
+### Search
+
+**Unified search** — `POST /v1/search`
+```json
+{
+  "query": "what is the termination clause?",
+  "workspace_id": "ws_abc123",
+  "store_identifiers": [],
+  "top_k": 10,
+  "max_results": 10,
+  "mode": "text | vision",
+  "search_type": "semantic | keyword | hybrid | agentic | grep | list",
+  "alpha": 0.5,
+  "fusion_type": "relative_score | ranked",
+  "hybrid_search": { "embedding_weight": 0.7, "text_weight": 0.3 },
+  "ranking_options": { "ranker": "rrf", "score_threshold": 0.5 },
+  "rerank": false | { "model": "mxbai-rerank-large-v2", "top_k": 20, "with_metadata": ["author"] },
+  "rewrite_query": false,
+  "agentic": false | { "max_rounds": 3, "queries_per_round": 4, "instructions": "prefer recent docs", "strict_top_k": true, "score_threshold": 0.5 },
+  "relevance_scoring": "none | scoring_only | scoring_and_filtering",
+  "filters": { "type": "and", "filters": [{"type": "eq", "key": "year", "value": 2026}] },
+  "content_type": ["invoice:*"],
+  "attribute": ["status:paid"],
+  "tag_id": ["tag_1"],
+  "file_ids": ["file_1"],
+  "target_vector": "default",
+  "distance": 0.7,
+  "certainty": 0.9,
+  "auto_limit": 1,
+  "autocut": 1,
+  "move_to": { "concepts": ["contract"], "force": 0.3 },
+  "move_away": { "concepts": ["draft"], "force": 0.2 },
+  "selection": { "type": "mmr", "balance": 0.5 },
+  "boost": { "prop": "recency", "weight": 0.1 },
+  "group_by": { "prop": "filename", "objects_per_group": 3, "number_of_groups": 5 },
+  "return_properties": ["content"],
+  "return_references": true,
+  "return_metadata": true,
+  "include_image": false,
+  "include_bboxes": false,
+  "media_content": "auto | always | never"
+}
+```
+**Response:**
+```json
+{
+  "results": [ { "chunk_id": "...", "content": "...", "score": 0.92, "score_breakdown": {}, "file_id": "...", "page_number": 2, "bbox": [], "citation": {} } ],
+  "search_query": "termination clause (rewritten)",
+  "total_count": 42
+}
+```
+
+**Grep** — `POST /v1/grep` with `{ store_identifiers[], pattern: "RE2 regex", top_k, content_groups: ["text","generated"], case_sensitive, file_ids[], filters, return_metadata }`
+**List chunks** — `POST /v1/list-chunks` with `{ store_identifiers[], top_k, file_ids[], sort_by, filters, return_metadata }`
+**Facets** — `POST /v1/metadata-facets` with `{ store_identifiers[], query, top_k, filters, facets[] }`
+**Aggregate** — `POST /v1/aggregate` with `{ workspace_id, query, total_count: true, return_metrics: {count, sum, max, min, mean, median, mode, top_occurrences, percentageTrue, percentageFalse, reference_count}, group_by: {prop, objects_per_group, number_of_groups}, filters, distance, object_limit }`
+
+---
+
+### Answer Generation / RAG
+
+**Ask** — `POST /v1/ask`
+```json
+{
+  "query": "summarize the termination clause",
+  "messages": [{"role": "user", "content": "..."}],
+  "workspace_id": "ws_abc123",
+  "store_identifiers": [],
+  "model": "gpt-4o",
+  "max_results": 10,
+  "stream": true,
+  "instructions": "answer in bullet points",
+  "qa_options": { "cite": true, "multimodal": false, "stream": true },
+  "search_options": { "rerank": true, "rewrite_query": true, "agentic": false, "score_threshold": 0.5 },
+  "filters": {},
+  "content_type": [], "attribute": [], "tag_id": [], "file_ids": [],
+  "response_format": { "type": "text", "mime_type": "application/json", "schema": {} }
+}
+```
+**Response (non-streaming):**
+```json
+{ "answer": "The termination clause states...<cite i=\"0\"/>", "sources": [ { "chunk_id": "...", "content": "...", "file_id": "...", "page_number": 2 } ] }
+```
+**Response (streaming):** SSE token events + final answer object (OpenAI-compatible).
+
+**Generative search** — `POST /v1/generate`
+```json
+{ "query": "...", "workspace_id": "ws_abc123", "search_type": "hybrid", "top_k": 10,
+  "single_prompt": "Summarize: {content}", "grouped_task": "...", "grouped_properties": ["filename"],
+  "generative_provider": "openai" }
+```
+
+---
+
+### Document Transformation
+
+**Create document** — `POST /v1/create-document` (JSON body)
+```json
+{ "markdown": "...with <ins data-revision-author=\"Jane\">new</ins> text...",
+  "output_format": "docx", "webhook_url": "...", "processing_location": "us" }
+```
+**Output:** `{ output_base64: "...", page_count, runtime, cost_breakdown }`
+
+**Form fill** — `POST /v1/fill`
+```json
+{ "file": "binary | file_url", "field_data": {"name": {"value": "John", "description": "full name"}},
+  "context": "Initial hire for new employee",
+  "confidence_threshold": 0.5, "page_range": "0,1", "output_format": "pdf | png" }
+```
+**Output:** `{ output_base64, fields_filled: ["name"], fields_not_found: [], page_count, runtime, cost_breakdown }`
+
+**Track changes** — `POST /v1/track-changes`
+```json
+{ "file": "binary | file_url", "output_format": "md,html,chunks", "page_range": "...", "paginate": false, "webhook_url": "..." }
+```
+**Thumbnails** — `GET /v1/thumbnails/{lookup_key}?page_range=0,1&thumb_width=200&track_changes=false`
+
+---
+
+### Pipelines & Workflows
+
+**Create pipeline** — `POST /v1/pipelines`
+```json
+{
+  "name": "Invoice extraction pipeline",
+  "steps": [
+    { "type": "convert", "settings": {"mode": "balanced", "save_checkpoint": true}, "eval_rubric_id": null },
+    { "type": "segment", "settings": {"segmentation_schema": {...}}, "eval_rubric_id": null },
+    { "type": "extract", "settings": {"page_schema": {...}, "extraction_mode": "balanced"}, "eval_rubric_id": 5 },
+    { "type": "custom", "custom_processor_id": "cp_abc", "settings": {} },
+    { "type": "fill", "settings": {} },
+    { "type": "map | filter | reduce | resolve | cluster | rank | split | gather | unnest | code_map | code_reduce | code_filter | parallel_map | equijoin | link_resolve | kg_build", "settings": {} }
+  ]
+}
+```
+**Run pipeline** — `POST /v1/pipelines/{id}/run`
+```json
+{ "file": "binary | file_url", "version": 0, "page_range": "...", "output_format": "markdown",
+  "run_evals": false, "skip_cache": false, "checkpoint_id": "chk_abc", "webhook_url": "..." }
+```
+**Poll execution** — `GET /v1/pipelines/executions/{id}`
+```json
+{
+  "execution_id": "exec_123", "pipeline_id": "pl_abc", "pipeline_version": 2,
+  "status": "pending | running | completed | completed_with_errors | failed",
+  "steps": [ { "step_index": 0, "step_type": "convert", "status": "completed", "lookup_key": "...", "result_url": "https://...", "checkpoint_id": "chk_abc", "error_message": null } ],
+  "started_at": "ISO-8601", "completed_at": null, "rate_breakdown": {}
+}
+```
+
+**Optimize pipeline (MOAR)** — `POST /v1/pipelines/{id}/optimize`
+```json
+{ "eval_fn": "...", "metric_key": "accuracy", "models": [], "max_iterations": 100, "save_dir": "..." }
+```
 **Output:** Pareto-optimal cost-accuracy frontier; `.best()`, `.cheapest()`, `.frontier`.
 
-### 6.17 Query Agent (Agentic NL → Operations)
+---
 
+### Evaluation
+
+**Create eval rubric** — `POST /v1/eval-rubrics` with `{ name, rules: [{type: "block|page|document", ...}], scoring: "0-5" }`
+**Generate from feedback** — `POST /v1/eval-rubrics/from-feedback` with `{ feedback: [...] }`
+**Forge evals** — `POST /v1/forge-evals` with `{ documents: [max 10], configs: [max 5], iterations: 3 }`
+**Validate KVPs** — `POST /v1/validate` with `{ project_id, data }` → `{ ValidatorResult: "Pass|Fail", ValidatorFailures: [] }`
+
+---
+
+### Query Agent
+
+**Ask** — `POST /v1/query-agent/ask`
+```json
+{
+  "query": "show me all invoices over $10k from 2026",
+  "messages": [],
+  "collections": [ { "name": "invoices", "target_vector": "default", "view_properties": ["amount","date"], "tenant": "customerA", "additional_filters": {} } ],
+  "result_evaluation": "none | llm",
+  "timeout": 30
+}
 ```
-POST   /v1/query-agent/ask           — Natural language → answer + sources
-         { query | messages[], collections: [{ name, target_vector, view_properties, tenant, additional_filters }],
-           result_evaluation: "none"|"llm", timeout }
-POST   /v1/query-agent/search        — Natural language → raw objects
-         { query, collections, limit, filtering: "recall"|"precision", diversity_weight }
-POST   /v1/query-agent/ask-stream    — Streaming with progress
-         { ..., include_progress, include_final_state }
-```
+**Search** — `POST /v1/query-agent/search` with `{ query, collections, limit, filtering: "recall|precision", diversity_weight }`
+**Streaming** — `POST /v1/query-agent/ask-stream` with `{ ..., include_progress: true, include_final_state: true }`
 
-### 6.18 Tenancy
+---
 
-```
-POST   /v1/workspaces/{id}/tenants   — Create tenants
-GET    /v1/workspaces/{id}/tenants   — List tenants
-PUT    /v1/workspaces/{id}/tenants   — Update tenant activity_status (ACTIVE/INACTIVE/OFFLOADED)
-```
+### Tenancy
 
-All standard operations (insert, query, aggregate, generate) accept a `tenant` header/param for scoped access.
+`POST /v1/workspaces/{id}/tenants` with `{ tenants: [{name: "customerA"}, {name: "customerB"}] }`
+All standard operations (insert, query, aggregate, generate) accept a `tenant` header/param for scoped access. Tenant lifecycle: `ACTIVE → INACTIVE → OFFLOADED`.
 
-### 6.19 MCP Server
+---
 
-The platform exposes an MCP server for AI assistant integration (Claude Code, Cursor, Windsurf, etc.) with tools for:
+### MCP Server
+
+`WS /v1/mcp` exposes tools for AI assistant integration (Claude Code, Cursor, Windsurf):
 - `search` — semantic/keyword/hybrid search
 - `ask` — RAG question answering
 - `convert` — document parsing
 - `extract` — structured extraction
 - `graph_query` — Cypher/graph queries (if graph store enabled)
 
-### 6.20 Visualization
+---
 
-```
-GET    /v1/knowledge-graph/{id}/visualize — Interactive HTML (Cytoscape/PyVis)
-POST   /v1/visualize/embeddings      — t-SNE 2D visualization of embeddings
-```
+# Part IV — Cross-Reference & Coverage
+
+## 1. Naming Variant Cross-Reference Table
+
+(See §3 Cross-Provider Synonym Glossary in Part I.)
+
+## 2. Alternative-Approaches Cross-Reference Table
+
+| Processing Step | Alternative Approaches |
+|---|---|
+| **File upload** | Multipart upload · URL-based · Base64 inline · Presigned-URL · Resumable/multipart · Cloud-storage loaders (S3/Azure/GCS/Drive/SharePoint) · Local FS/directory · In-memory/stream · Pre-chunked (MXJSON) · Docling JSON round-trip · `datalab://` references · JSON object insertion |
+| **Parsing** | Multi-model pipeline (layout+OCR+table) · Single end-to-end VLM · Native multimodal vision · Managed automatic · Dedicated OCR API · Word-level OCR with font metadata · Format-specific backends · Audio/video ASR · Legacy office conversion |
+| **Segmentation** | Schema-guided · Automatic boundary detection · Page-structure segmentation |
+| **Chunking** | Static/token-count · Character-count · Separator/hierarchical · Markdown/header-aware · Hierarchical/structure-pure · Hybrid/tokenization-aware · Line-based · Word-count with overlap · Structure-preserving · Automatic/managed · Pre-chunked (bypass) · Gather (context enrichment) |
+| **Chunk enrichment** | Summary enrichment · Contextualization at index time · Gather (context windows) · Generated metadata · Custom enrichers |
+| **Data extraction** | JSON-schema-driven LLM extraction · BBox annotation · Document annotation · KVP with ontology · Table/line-item extraction · Semantic normalization · Verbatim text extraction · Form filling · Schema auto-generation · Pydantic-template extraction · Dense extraction |
+| **Classification** | AI document classification · Hierarchical taxonomy (Facets) · Flat tags · Custom processor classification · LLM map with enum · Filter-based · Picture classification · Zero-shot via embeddings |
+| **Entity resolution** | Blocking+LLM comparison+union-find · Deterministic node ID registry · LLM entity standardization · Dense dedupe · Link resolve · Equijoin (fuzzy join) · Cross-references · BARGAIN cascade |
+| **Clustering** | Hierarchical agglomerative · KMeans · Louvain community detection · Value sampling cluster · t-SNE visualization |
+| **Embedding** | Auto-vectorization on insert · Managed automatic · Standalone embedding API · Configurable embedder · Named vectors (multi-model) · Multi-vector (ColBERT/ColPali) · Multimodal embeddings · Vision (VLM) embeddings · Whole-document embeddings · Self-provided vectors · Embeddings as ML features |
+| **Indexing** | Managed vector store · Self-hosted vector DB (HNSW/Flat/Dynamic/HFresh) · Vespa · LanceDB · Native graph DB · File-based · DPE database · S3 integration · BYOB |
+| **Query rewriting** | Query rewriting (observable) · LLM query rewriter · LLM query extension (sub-queries) · Model-generated queries |
+| **Search** | BM25/BM25F keyword · Grep regex · near_text/near_vector/near_object/near_image · Semantic via embeddings · Hybrid (alpha-weighted) · RRF · Hybrid vector+keyword+vision · Hybrid web+internal · Agentic search · Query Agent · Model-autonomous File Search · List chunks · Multi-store/federated · Cross-collection Explore · Cross-document reasoning |
+| **Filtering** | Comparison filters · Compound filters · AIP-160 expressions · Weaviate filter operators · Cross-reference filtering · Nested object filtering · Content-type/facet filters · Tag filters · File ID scoping |
+| **Reranking** | Cross-encoder (pointwise) · Listwise (instruction-steerable) · LLM reranking · RRF fusion · Relevance scoring modes · Sequential chaining · Boost (soft ranking) |
+| **Caching** | Semantic cache · Result caching · LLM call caching · Memoized terminal actions · Persistent media IDs · HNSW snapshots |
+| **RAG / QA** | Hosted RAG (model-autonomous) · Managed RAG (one-call) · Two-stage retrieve+generate · Generative search in search calls · Retrieval API + manual synthesis · Document QnA · RAG via retriever+map/reduce · GraphRAG · Query Agent Ask · Structured grounded output |
+| **Aggregation** | Aggregate queries · Grouped search (GroupBy) · Reduce operator · Facets · Rank operator |
+| **Knowledge graph** | Schema-validated Pydantic pipeline · Schema-free LLM triple extraction · Native graph DB storage · Link resolve · Cross-references |
+| **Document transformation** | DOCX generation · Form filling · Track changes extraction · Document round-trip · Thumbnails · Synthetic data generation |
+| **Orchestration** | Declarative pipelines (YAML/Python) · Temporal workflows · Declarative map-reduce framework · Pipeline + RoutedPipeline · QueryEngine + CachedQueryEngine · run_pipeline · MCP server · Automatic managed pipeline |
+| **Evaluation** | Parse quality score · Eval rubrics · Forge Evals · Custom processor evals · Per-field verification · Per-field confidence · KVP validation · Gleaning · Validate · Calibration · Plan rewrites · BARGAIN cascades · MOAR MCTS optimization · Operation-level optimize · Semantic cache metrics |
 
 ---
 
-## 7. End-to-End Reference Flows
+## 3. End-to-End Reference Flows
 
 ### Flow 1: Simple Document → Search → Answer (Managed RAG)
 ```
@@ -1439,14 +1912,14 @@ POST   /v1/visualize/embeddings      — t-SNE 2D visualization of embeddings
 
 ### Flow 10: Multi-Tenant Isolated RAG
 ```
-1. Create workspace with multi_tenancy enabled
+1. Create workspace with multi_tenancy: true
 2. POST /v1/workspaces/{id}/tenants { tenants: [{name: "customerA"}, {name: "customerB"}] }
 3. Insert + search + ask with tenant header per customer
 ```
 
 ---
 
-## 8. Coverage Matrix
+## 4. Coverage Matrix
 
 This matrix shows which systems contribute to each pipeline stage. ✅ = native support; ➖ = achievable via composition; ❌ = not supported.
 
@@ -1463,13 +1936,13 @@ This matrix shows which systems contribute to each pipeline stage. ✅ = native 
 | Clustering | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ➖ |
 | Embedding | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Indexing/storage | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Query rewriting | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
 | Search (lexical) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Search (vector) | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Search (hybrid) | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Search (agentic) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
 | Filtering | ❌ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Reranking | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Query rewriting | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ |
 | Caching | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ✅ |
 | RAG / QA | ➖ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | Knowledge graph | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ➖ |
@@ -1484,4 +1957,4 @@ This matrix shows which systems contribute to each pipeline stage. ✅ = native 
 
 ---
 
-> **End of specification.** This document represents the union of all capabilities described across the eleven surveyed systems. Individual systems implement subsets; the unified API specification in §6 encompasses the full feature surface. Refer to individual system files for implementation-specific details, exact endpoint signatures, and system-specific constraints.
+> **End of specification.** This document represents the union of all capabilities described across the eleven surveyed systems. Individual systems implement subsets; the unified API specification in Part III encompasses the full feature surface. Refer to individual system files for implementation-specific details, exact endpoint signatures, and system-specific constraints.
