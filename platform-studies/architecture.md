@@ -156,6 +156,9 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `GET /v1/api_keys` — list (prefix+name only). *Providers*: all L1. *Dep*: L5 Identity.
 - Service: `DELETE /v1/api_keys/{id_or_prefix}` — revoke. *Providers*: all L1.
 - Service: `POST /v1/api_keys/register` — register an externally-owned Ed25519-signed key. *Providers*: Bas (Frontier Gateway).
+- Service: Authorization header variants — `Authorization: Bearer <key>` (de-facto/OpenAI-compatible, all L1); legacy `Authorization: Api-Key <key>` (Bas legacy + Frontier Gateway); bare `Authorization: <key>` (RunP Serverless native). *Providers*: per platform.
+- Service: HF fine-grained token (`hf_...`) — scoped per-repo/per-task permissions. *Providers*: HF.
+- Service: Federated/resellable API key (minted under a group) for reselling a hosted model under a branded URL. *Providers*: Bas (Frontier Gateway).
 
 **Module — Organization / Project / Group**
 - Service: `POST /v1/organizations` — create org/tenant. *Providers*: all (workspace/project scoping).
@@ -163,6 +166,15 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `POST /v1/gateway/groups` — hierarchical billing entity with inherited limits. *Providers*: Bas.
 - Service: `GET /v1/gateway/groups/{id}/usage` — usage against limits. *Providers*: Bas.
 - Service: cost attribution header `X-HF-Bill-To`/`bill_to`. *Providers*: HF. *Dep*: L5 Billing.
+
+**Module — Key Scoping & RBAC**
+- Service: Workspace/personal key types (`PERSONAL`, `WORKSPACE_MANAGE_ALL`, `WORKSPACE_INVOKE`, `WORKSPACE_EXPORT_METRICS`). *Providers*: Bas.
+- Service: Per-key scope to specific model IDs. *Providers*: Bas.
+- Service: Hierarchical groups with inherited rate/usage limits (`INDEPENDENT` vs `CASCADING` enforcement). *Providers*: Bas (Frontier Gateway).
+- Service: Per-endpoint key permissions (`None`/`Restricted`/`Read-Write`/`Read-Only`). *Providers*: RunP.
+- Service: Organizations + Resource Groups (Enterprise). *Providers*: HF.
+- Service: Cost centers (team/project/department). *Providers*: RunP, Tog.
+- Service: SSO + SCIM (Enterprise identity federation). *Providers*: Bas. *Dep*: L5 Identity.
 
 ### Product L1.A.2 — Hardware Discovery
 
@@ -173,12 +185,21 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `GET /v0/templates` — deployable model+flavor+gpu+region combos (dedicated). *Providers*: Neb.
 - Service: `GET /v1/hardware?model={id}` — hardware options for a model. *Providers*: Tog.
 - Service: `GET /v1/availability-zones`. *Providers*: Fw, Neb, Tog, RunP.
+- Service: Model "warm" status tag (HF `inference:"warm"`, Fw serverless tag) — indicates model kept warm in shared fleet. *Providers*: HF, Fw.
+- Service: Unified model id grammar `<namespace>/<model>[:<flavor>][@<snapshot>][#<deployment>]` with optional `:provider`/`:policy` suffixes for routed serverless. *Providers*: cross-platform reference.
 
 **Module — Variant & Flavor Selection**
-- Service: Fast variant suffix (`-fast`, `:fastest`, `routers/...-fast`). *Providers*: Neb, Fw, HF.
+- Service: Fast variant suffix (`-fast`, `:fastest`, `routers/...-fast`, Tog `Turbo`). *Providers*: Neb, Fw, HF, Tog.
 - Service: `service_tier` enum (auto/default/over-limit/flex/no-limit/priority). *Providers*: Neb, Fw.
 - Service: Deployment shape templates (Fast/Throughput/Minimal). *Providers*: Fw.
 - Service: Provider routing policy (`:fastest`/`:cheapest`/`:preferred`/`:<provider>`). *Providers*: HF.
+
+**Module — Dedicated Data-Plane Model Id Forms**
+- Service: Deployment name as `model` (leading slash) — `/Qwen/Qwen3.5-9B-FP8-bb04c904`. *Providers*: Tog dedicated.
+- Service: Deployment `Name` as `model` — `accounts/<acct>/deployments/<id>`. *Providers*: Fw on-demand.
+- Service: `model#deployment` composite (multi-LoRA) — `accounts/.../ft-model#accounts/.../dep`. *Providers*: Fw multi-LoRA.
+- Service: `routing_key` returned at endpoint creation, passed as `model` to data plane. *Providers*: Neb dedicated.
+- Service: Endpoint subdomain as model target — `https://model-{id}.api.baseten.co`, `https://{id}.{region}.{cloud}.endpoints.huggingface.cloud`. *Providers*: Bas, HF.
 
 ## Domain L1.B — Model Packaging & Artifact Management
 
@@ -191,11 +212,13 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `weights[].source` block with URI schemes (hf/s3/gs/azure/r2/bt/cw) + auth + allow_patterns. *Providers*: Bas.
 - Service: Custom container image (Docker Hub/ECR/ACR/GCR/GHCR/NGC). *Providers*: HF, RunP, Tog, Bas.
 - Service: Custom handler (`handler.py`/`EndpointHandler`/`Sprocket`/Truss `Model`). *Providers*: HF, RunP, Tog, Bas.
+- Service: Init hook (`Model.load`/`EndpointHandler.__init__`/`Sprocket.setup`) — distinct from predict entrypoint (`Model.predict`/`EndpointHandler.__call__`/`Sprocket.predict`); run once at replica startup. *Providers*: Bas, HF, Tog.
 
 **Module — LoRA Adapters**
 - Service: Live merge (one LoRA at deploy time, no runtime overhead). *Providers*: Fw.
 - Service: Multi-LoRA (base + addons loaded at request time, `model#deployment`, `lora_adapters`, `enable_lora`). *Providers*: Fw, Bas (Engine-Builder), HF vLLM, RunP.
 - Service: Per-request image-gen LoRA (`loras:[{scale,url}]`). *Providers*: Neb.
+- Service: Merge single adapter into base weights (recommendation: better perf than multi-LoRA when only one adapter). *Providers*: Bas.
 
 **Module — Quantization**
 - Service: FP16/BF16 (`no_quant`). *Providers*: Bas, HF, RunP, Tog, Neb.
@@ -278,11 +301,15 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Context/prompt caching (automatic serverless; configurable dedicated). *Providers*: all.
 - Service: KV cache quantization (`fp8`, `fp8_e5m2`, `fp8_e4m3`). *Providers*: Bas, HF, Neb.
 - Service: Speculative decoding (lookahead/Eagle/MTP/N-gram/draft model). *Providers*: Bas, Fw, Tog (default on), Neb, HF vLLM.
+- Service: Speculative-decoding tunables — `lookahead_ngram_size`, `lookahead_verification_set_size`, `lookahead_windows_size`, `enable_b10_lookahead` (Baseten lookahead); `--no-speculative-decoding` (Tog default-off override); `speculator` block (Bas). *Providers*: Bas, Tog.
 - Service: Disaggregated serving (prefill/decode split). *Providers*: Bas BIS-LLM (Enterprise).
 - Service: KV-aware routing (route to replica with cached prefix). *Providers*: Bas BIS-LLM, Fw (session affinity).
 
 **Module — Engine Args**
 - Service: `max_num_seqs`, `max_num_batched_tokens`, `tensor_parallel_size`, `data_parallel_size`, `kv_cache_dtype`, `gpu_memory_utilization`, `enable_chunked_prefill`, `enable_lora`, `block_size`, `swap_space`, `max_concurrency`, `served_model_name`. *Providers*: configurable on dedicated (Bas, HF, RunP, Tog).
+- Service: `max_num_tokens` / `max_batch_size` (max tokens per batch, Bas). *Providers*: Bas.
+- Service: `kv_cache_free_gpu_mem_fraction` (Bas KV cache fraction). *Providers*: Bas.
+- Service: Runtime config — `batch_scheduler_policy`, `webserver_default_route`. *Providers*: Bas.
 
 ## Domain L1.E — Deployment Lifecycle & Traffic Management
 
@@ -290,23 +317,27 @@ Different products use different names for the same underlying concepts. The tab
 
 **Module — Environments & Promotion**
 - Service: Environments (dev/staging/production) with stable endpoints. *Providers*: Bas.
-- Service: `POST /v1/models/{id}/environments/{env}/promote`. *Providers*: Bas.
+- Service: `POST /v1/models/{id}/environments/{env}/promote` — promote deployment to env. *Providers*: Bas.
+- Service: `PATCH /v1/models/{id}/environments/{env}` — rolling-deploy config (max_surge/max_unavailable). *Providers*: Bas.
+- Service: `POST /v1/models/{id}/environments/{env}/{pause|resume|cancel|force_cancel|force_roll_forward}_promotion`. *Providers*: Bas.
 - Service: Rolling deployments (gradual shift, max_surge/unavailable, pause/resume/cancel/force_roll_forward). *Providers*: Bas.
 - Service: Development deployment with `truss push --watch` live-reload. *Providers*: Bas.
 - Service: Labels (key-value metadata on deployments). *Providers*: Bas.
 - Service: Frontier Gateway endpoint re-point. *Providers*: Bas.
 - Service: Publishing / managing default deployments. *Providers*: Fw.
 - Service: Pause/resume (stop billing, keep config). *Providers*: HF, Neb, Tog, RunP Pods.
+- Service: `POST /v1/deployments/{id}/activate` / `/deactivate` / `/wake`. *Providers*: Bas, HF, Neb, RunP, Tog.
 - Service: Activate/deactivate, reset/restart. *Providers*: Bas, RunP.
 
 **Module — Autoscaling**
-- Service: Concurrency per replica (`concurrency_target`, `MAX_CONCURRENCY`). *Providers*: Bas, RunP.
+- Service: Concurrency per replica (`concurrency_target`, `target_utilization_percentage`, `MAX_CONCURRENCY`). *Providers*: Bas, RunP.
 - Service: Tokens in flight (`target_in_flight_tokens`). *Providers*: Bas BIS-LLM.
-- Service: GPU utilization threshold. *Providers*: HF.
-- Service: Pending requests. *Providers*: HF.
-- Service: Queue delay / request count scalers. *Providers*: RunP.
-- Service: Load targets (tokens_gen/s, prompt_tokens/s, rps, concurrent). *Providers*: Fw.
-- Service: `PATCH /v1/deployments/{id}/autoscaling_settings` (min/max replicas, windows, delays). *Providers*: all dedicated.
+- Service: GPU utilization threshold (default 80%). *Providers*: HF.
+- Service: Pending requests (per replica, default 1.5, 20s window). *Providers*: HF.
+- Service: Queue delay / request count scalers (`QUEUE_DELAY`, `REQUEST_COUNT`). *Providers*: RunP.
+- Service: Load targets (`tokens_generated_per_second`, `prompt_tokens_per_second`, `requests_per_second`, `concurrent_requests`, `default`; max replica count across all targets). *Providers*: Fw.
+- Service: `PATCH /v1/deployments/{id}/autoscaling_settings` — `min_replica`, `max_replica`, `autoscaling_window`, `scale_down_delay`, `concurrency_target`, `target_utilization_percentage`, `target_in_flight_tokens`, `load_targets`, `scale_up_window`, `scale_down_window`, `scale_to_zero_window`, `idle_timeout`/`inactive_timeout`, `scale_down_half_life_seconds`. *Providers*: all dedicated.
+- Service: K8s Cluster Autoscaler (scales nodes for GPU clusters). *Providers*: Tog clusters.
 
 **Module — Scale-to-Zero & Cold Starts**
 - Service: `min_replica=0` / `workersMin=0` / `min_replicas=0`. *Providers*: all.
@@ -318,7 +349,7 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Parking (request waits at routing layer). *Providers*: Bas.
 
 **Module — Health Checks**
-- Service: Startup probe (model finished initializing). *Providers*: Bas, HF.
+- Service: Startup probe (model finished initializing; Bas 30–50 min timeout). *Providers*: Bas, HF.
 - Service: Readiness probe. *Providers*: Bas, HF, RunP, Tog.
 - Service: Liveness probe (restart on failure). *Providers*: Bas.
 - Service: Custom `is_healthy()` logic. *Providers*: Bas.
@@ -336,8 +367,12 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Queue-based (built-in job queue + handler). *Providers*: RunP QB, Tog dedicated containers.
 - Service: Regional data-plane URL. *Providers*: Neb, HF.
 - Service: Frontier Gateway (branded URL, federated keys, hierarchical groups). *Providers*: Bas.
-- Service: `POST /v1/gateway/endpoints` — map slug → target. *Providers*: Bas.
+- Service: `POST /v1/gateway/endpoints` — map slug → target (provider, model_id, env). *Providers*: Bas.
+- Service: `GET /v1/gateway/endpoints`. *Providers*: Bas.
+- Service: `PATCH /v1/gateway/endpoints/{id}` — re-point target. *Providers*: Bas.
+- Service: `DELETE /v1/gateway/endpoints/{id}`. *Providers*: Bas.
 - Service: `POST /v1/gateway/groups/{id}/api_keys` — mint federated key. *Providers*: Bas.
+- Service: `POST /v1/gateway/groups/{id}/api_keys/register` — register existing signed key. *Providers*: Bas.
 
 ### Product L1.F.2 — Rate Limiting
 
@@ -360,6 +395,7 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Async (`async_predict`, `/run`+`/status`, queue API, `background:true`). *Providers*: Bas, RunP, Tog, Neb.
 - Service: Batch (JSONL, 50% off, 24h window). *Providers*: Fw (`batchInferenceJobs`), Tog (`/v1/batches`).
 - Service: RL rollout (session affinity, hot-load, MoE router replay). *Providers*: Fw.
+- Service: RL rollout hot-load — `POST /hot_load/v1/models/hot_load` (`reset_prompt_cache: all|new_session|none`); request headers `x-multi-turn-session-id`, `x-session-affinity`, `fireworks-model`, `fireworks-deployment`; body `include_routing_matrix`, `logprobs`, `echo`. *Providers*: Fw.
 - Service: Responses API (stateful, `previous_response_id`, built-in tools, MCP). *Providers*: Fw, HF, Neb, Tog.
 
 ### Product L1.G.2 — Task Types
@@ -369,6 +405,7 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `POST /v1/completions` (legacy). *Providers*: all L1.
 - Service: `POST /v1/responses`. *Providers*: Fw, HF, Neb, Tog.
 - Service: `POST /v1/messages` (Anthropic-compat). *Providers*: Bas, Fw.
+- Service: `POST /inference` (Anthropic-compat alternate route). *Providers*: Fw.
 - Service: `POST /v1/embeddings`. *Providers*: all (HF via `/models/{id}`).
 - Service: `POST /v1/rerank`. *Providers*: Fw, Neb, Tog, Bas BEI (`/rerank`); HF via logits.
 - Service: `POST /v1/images/generations`. *Providers*: Neb, Tog; HF via `/models/{id}`.
@@ -392,6 +429,17 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Async priority levels (0/1/2). *Providers*: Bas.
 - Service: Async retry config (`inference_retry_config`). *Providers*: Bas.
 - Service: Webhook delivery (signed HMAC, retries 2 attempts ~2s backoff). *Providers*: Bas, RunP.
+- Service: Async max queue time (Bas 72h; RunPod configurable TTL). *Providers*: Bas, RunP.
+
+### Product L1.G.4 — Batch Lifecycle (GPU platforms)
+
+**Module — Batch Job Management**
+- Service: `POST /v1/batches` (upload JSONL, model, params). *Providers*: Tog.
+- Service: `GET /v1/batches/{id}`, `GET /v1/batches` (list), `POST /v1/batches/{id}/cancel`. *Providers*: Tog.
+- Service: `POST /batchInferenceJobs` (Fw; 12/24/48/72h window). *Providers*: Fw.
+- Service: `GET /batchInferenceJobs/{id}`. *Providers*: Fw.
+- Service: Files API for batch input/output download. *Providers*: Tog, Fw.
+- Service: Batch discount (50% off serverless; per successful response). *Providers*: Fw, Tog.
 
 ## Domain L1.H — Output Control & Generation Parameters
 
@@ -415,6 +463,7 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `chat_template_kwargs` (thinking/enable_thinking/clear_thinking/medium_effort). *Providers*: Tog.
 - Service: `reasoning` object (Responses API, gpt-5/o-series). *Providers*: Neb.
 - Service: Preserved / turn-level / interleaved thinking (GLM-5). *Providers*: Tog.
+- Service: Reasoning output-field variants — `reasoning` / `reasoning_content` / `<think>` tags (Tog supports all three). *Providers*: Tog.
 
 **Module — Structured Output**
 - Service: `response_format:{type:json_schema|json_object|text}` + strict. *Providers*: all OpenAI-compat.
@@ -422,6 +471,7 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `grammar:{type,value}` (TGI-style). *Providers*: HF.
 - Service: `output_config:{format:{type:json_schema,schema}}` (Anthropic-compat). *Providers*: Fw.
 - Service: Pydantic via `client.beta.chat.completions.parse`. *Providers*: Bas, HF, Neb.
+- Service: `text.format` / `text_format` (Pydantic, Responses API). *Providers*: HF, Neb.
 
 **Module — Function / Tool Calling**
 - Service: `tools` array (OpenAI function schema). *Providers*: all L1.
@@ -446,7 +496,7 @@ Different products use different names for the same underlying concepts. The tab
 ### Product L1.I.1 — Metrics & Logs
 
 **Module — Metrics Export**
-- Service: OpenMetrics API (Prometheus text). *Providers*: HF (Team/Enterprise).
+- Service: OpenMetrics API (Prometheus text) — `GET /v1/endpoints/{id}/open-metrics`. *Providers*: HF (Team/Enterprise).
 - Service: Prometheus + Grafana. *Providers*: Neb.
 - Service: Prometheus-style metrics endpoint (dedicated). *Providers*: Fw.
 - Service: Analytics dashboard (web UI). *Providers*: all L1.
@@ -454,8 +504,17 @@ Different products use different names for the same underlying concepts. The tab
 - Service: `perf_metrics_in_response` (streaming body). *Providers*: Fw.
 - Service: `X-BASETEN-MODEL-PREDICTION-ATTEMPTS` (retry count). *Providers*: Bas.
 
+**Module — Metric Categories**
+- Service: Traffic metrics (RPM, input/output tokens/min, tokens per request). *Providers*: all.
+- Service: Latency metrics (p50/p90/p95/p99, TTFT, end-to-end, TPS). *Providers*: Bas, HF, Neb, Tog, RunP.
+- Service: Autoscaling/capacity metrics (active replicas, ready replicas). *Providers*: Bas, HF, Neb, RunP.
+- Service: Error metrics (by status code, error rate). *Providers*: all.
+- Service: Engine-level metrics (`tps_per_request`, `speculation_rate`, `kv_cache_hit_rate`, cpu/gpu/memory usage). *Providers*: Bas BIS-LLM.
+- Service: Cold start time. *Providers*: RunP.
+- Service: Execution/delay time percentiles. *Providers*: RunP.
+
 **Module — Runtime Logs**
-- Service: Runtime logs tab (real-time, filterable by timestamp/level/content/replica). *Providers*: HF (30-day), Bas, RunP, Tog.
+- Service: Runtime logs tab (real-time, filterable by timestamp/level/content/replica) — `GET /v1/endpoints/{id}/logs`. *Providers*: HF (30-day), Bas, RunP, Tog.
 - Service: `tg beta jig logs --follow`. *Providers*: Tog dedicated containers.
 
 ### Product L1.I.2 — Billing & Cost Attribution
@@ -478,6 +537,8 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Cost centers (team/project/department). *Providers*: RunP, Tog.
 - Service: Resource Groups (Enterprise). *Providers*: HF.
 - Service: Billing webhooks (per-request token counts, `externalEntityId`, idempotency key, HMAC-signed). *Providers*: Bas Frontier Gateway.
+- Service: Billing webhook body schema — `POST {your_webhook_url}`; headers `X-Signature` (HMAC-SHA256), `X-Request-ID`; body `{type:"API_BILLING_USAGE", data:{events:[{idempotencyKey, timestamp, requestId, modelSlug, externalEntityId, apiKeyPrefix, tokens:{input,output,cachedInput}}]}}`. *Providers*: Bas Frontier Gateway.
+- Service: Billing history endpoints — `GET /v1/billing/endpoints`, `GET /v1/billing/pods`, `GET /v1/gateway/groups/{id}/usage`. *Providers*: Fw, RunP, Bas.
 - Service: Spending tiers → higher rate-limit upper bounds. *Providers*: Fw, Tog.
 - Service: Spend limit (default $80/hr). *Providers*: RunP.
 - Service: Prepaid credits / automatic recharge. *Providers*: HF, RunP.
@@ -502,11 +563,18 @@ Different products use different names for the same underlying concepts. The tab
 - Service: Reserved capacity (guarantee during scale-up). *Providers*: Fw, Neb.
 - Service: Reservations (guarantee for clusters). *Providers*: Tog.
 
+**Module — Reliability Schema**
+- Service: `retry_policy: {max_attempts, initial_delay_ms, max_delay_ms, multiplier, retryable_codes, non_retryable_codes}`. *Providers*: Bas.
+- Service: `hedge: {hedge_delay, hedge_budget_pct}`. *Providers*: Bas Performance Client.
+- Service: `circuit_breaker: {memory_threshold_pct, cooldown_seconds}`. *Providers*: Bas.
+- Service: Reliability response headers — `X-BASETEN-MODEL-PREDICTION-ATTEMPTS`, `x-ratelimit-reset`, `Retry-After`. *Providers*: Bas, Tog, Fw, Neb.
+
 ### Product L1.J.2 — Security & Compliance
 
 **Module — Network & Data Security**
 - Service: TLS/SSL in transit. *Providers*: all L1.
-- Service: PrivateLink / VPC (private IP intra-region). *Providers*: HF (AWS PrivateLink), Tog (clusters).
+- Service: PrivateLink / VPC (private IP intra-region) — config params: AWS account id, VPC service name, sharing. *Providers*: HF (AWS PrivateLink), Tog (clusters).
+- Service: `access_level: private | public | authenticated` — endpoint visibility control. *Providers*: HF, Bas, Neb.
 - Service: Global private networking (Pod-to-Pod). *Providers*: RunP.
 - Service: Non-root containers. *Providers*: HF.
 - Service: Model security (private repos, malware/pickle scans). *Providers*: HF.
@@ -534,6 +602,111 @@ Different products use different names for the same underlying concepts. The tab
 - Service: SWE-agent preloaded environments. *Providers*: Neb.
 - Service: Code interpreter (built-in tool in Responses API). *Providers*: Neb.
 - Service: Local shell / apply-patch tools (Responses). *Providers*: Neb.
+
+---
+
+## Domain L1.K — Developer Ergonomics & SDK Surface
+
+### Product L1.K.1 — Client Libraries & Tooling
+
+**Module — SDK / CLI / Spec**
+- Service: OpenAI SDK drop-in (OpenAI-compatible client points at platform base URL). *Providers*: all L1 (Bas, Fw, HF, Neb, RunP, Tog).
+- Service: Native Python SDK — Bas (Performance Client), Fw (`fireworks-ai`), HF (`huggingface_hub`), RunP (`runpod`), Tog (`together`). *Providers*: Bas, Fw, HF, RunP, Tog.
+- Service: Native CLI — Bas (`baseten`), Fw (`firectl`), HF (`hf`), Tog (`tg`/`together`). *Providers*: Bas, Fw, HF, Tog.
+- Service: OpenAPI spec published. *Providers*: Bas, HF, Neb, RunP, Tog.
+
+---
+
+## L1 Cross-Cutting — Deployment-Mode Decision Matrix
+
+> Use this to pick the right mode for a workload. Sourced from `gpu/summary.md` Deployment-Mode Decision Matrix.
+
+| Need | Recommended mode | Why |
+|---|---|---|
+| Quick prototype, popular model, no infra | Serverless (any platform) | No setup; per-token; no cold starts. |
+| Higher reliability during peak (serverless) | Priority tier (Fw `service_tier:"priority"`) | Less likely to be load-shed. |
+| Lowest latency (serverless) | Fast variant (Fw `routers/...-fast`, Neb `-fast`, HF `:fastest`) | Optimized for speed. |
+| Custom/fine-tuned model | Dedicated endpoint (all) or Dedicated containers (Tog) | Serverless doesn't support custom weights. |
+| LoRA adapters | Dedicated (Fw multi-LoRA/live-merge, Bas, HF vLLM) | Serverless doesn't support LoRA. |
+| Predictable latency, no rate limits | Dedicated endpoint | Reserved hardware. |
+| SLA-backed stock model | Provisioned throughput (Tog) | Defined throughput + 99% reliability. |
+| Full control, training, custom stack | GPU clusters (Tog) or Pods (RunP) | K8s/Slurm; run anything. |
+| Custom Docker inference, managed infra | Dedicated containers (Tog) or Custom container (HF/RunP/Bas) | Bring image; platform runs it. |
+| Large offline batch, 50% off | Batch (Fw, Tog) | Async JSONL; 24h window. |
+| RL rollout traffic | Dedicated (Fw rollout features) | Session affinity, hot-load, MoE replay. |
+| Code execution for AI agents | Sandboxes (Neb) | Git-branchable isolated envs. |
+| Cost optimization (scale-to-zero) | `min_replica=0` (any dedicated) | Pay nothing when idle; cold start on next request. |
+| Cost optimization (always warm) | `min_replica>=1` (any dedicated) | No cold starts; charged at lower rate (RunP). |
+| Data residency / fixed region | Dedicated (Neb, Fw, Tog) | Region set at creation, immutable. |
+| Resell a hosted model under your brand | Frontier Gateway (Bas) | Federated keys, hierarchical limits, billing webhooks. |
+
+## L1 Cross-Cutting — Per-Platform Capability Coverage Matrix
+
+> Sourced from `gpu/summary.md` Capability Coverage Matrix Per Platform. ✅ = supported, — = not supported, (note) = partial/conditional.
+
+| Capability | Bas | Fw | HF | Neb | RunP | Tog |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Serverless chat | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Legacy completions | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Responses API | — | ✅ | ✅ | ✅ | — | ✅ |
+| Anthropic-compat | ✅ | ✅ | — | — | — | — |
+| Embeddings | ✅ (BEI) | ✅ | ✅ | ✅ | (vLLM) | ✅ |
+| Rerank | ✅ (BEI) | ✅ | (logits) | ✅ | — | ✅ |
+| Image generation | — | — | ✅ | ✅ | (media) | ✅ |
+| Video generation | — | — | ✅ | — | (media) | ✅ |
+| Audio STT/TTS | — | — | ✅ | — | (media) | ✅ |
+| Vision (images) | ✅ | ✅ | ✅ | ✅ | (model) | ✅ |
+| Video/audio input | — | ✅ (dedicated) | — | — | — | ✅ (dedicated) |
+| Function calling | ✅ | ✅ | ✅ | ✅ | (vLLM) | ✅ |
+| Structured output (JSON schema) | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| Structured output (regex) | — | — | ✅ | — | — | ✅ |
+| Reasoning control | — | ✅ | ✅ | ✅ | — | ✅ |
+| MCP tools | — | ✅ | ✅ | ✅ | — | — |
+| Built-in tools (file search/code/web/computer) | — | — | — | ✅ | — | — |
+| Streaming | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Async inference | ✅ | — | — | ✅ | ✅ | ✅ (containers) |
+| Batch inference | — | ✅ | — | — | — | ✅ |
+| RL rollout / MoE replay | — | ✅ | — | — | — | — |
+| LoRA (live merge) | — | ✅ | — | — | — | — |
+| LoRA (multi-adapter) | ✅ | ✅ | ✅ | — | ✅ | — |
+| Custom model upload | ✅ (weights) | ✅ (upload API) | ✅ (Hub) | ✅ (beta) | ✅ (image) | ✅ (image) |
+| Custom container | ✅ | — | ✅ | — | ✅ | ✅ |
+| Quantization (FP8/FP4) | ✅ | ✅ | ✅ | ✅ | ✅ (AWQ/GPTQ) | ✅ |
+| Speculative decoding | ✅ | ✅ | ✅ | ✅ | — | ✅ |
+| Dedicated endpoint | ✅ | ✅ | ✅ | ✅ | ✅ (Pod) | ✅ |
+| Provisioned throughput (SLA) | — | — | — | — | — | ✅ |
+| GPU clusters (K8s/Slurm) | — | — | — | — | — | ✅ |
+| Pods (raw instance) | — | — | — | — | ✅ | — |
+| Sandboxes (code exec) | — | — | — | ✅ | — | — |
+| Environments (dev/staging/prod) | ✅ | — | — | — | — | — |
+| Rolling deployments | ✅ | — | — | — | — | — |
+| Autoscaling (concurrency) | ✅ | ✅ | — | — | ✅ | ✅ |
+| Autoscaling (tokens) | ✅ (BIS) | ✅ | — | — | — | — |
+| Autoscaling (GPU util) | — | — | ✅ | — | — | — |
+| Scale-to-zero | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Wake endpoint | ✅ | (auto) | ✅ | ✅ | ✅ | ✅ |
+| Health checks (startup/readiness/liveness) | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+| KV-aware routing | ✅ (BIS) | ✅ (session affinity) | — | — | — | — |
+| Session affinity | ✅ | ✅ | ✅ (user) | — | — | — |
+| Service tiers | — | ✅ | — | ✅ | — | — |
+| Adaptive/dynamic rate limits | — | ✅ | — | ✅ | — | ✅ |
+| Hierarchical billing/groups | ✅ (Frontier) | — | — | — | — | — |
+| Federated API keys | ✅ | — | — | — | — | — |
+| Billing webhooks | ✅ (Frontier) | — | — | — | — | — |
+| Per-key spend tracking | — | — | — | — | — | ✅ |
+| Cost attribution (org/project) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| OpenMetrics/Prometheus | — | ✅ (dedicated) | ✅ | ✅ | — | — |
+| Runtime logs | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+| PrivateLink/VPC | — | — | ✅ | — | ✅ (global net) | ✅ (clusters) |
+| SOC2 | ✅ | ✅ | ✅ | — | — | ✅ |
+| HIPAA | — | ✅ | ✅ | — | — | — |
+| GDPR | — | — | ✅ | — | ✅ | — |
+| SSO/SCIM | ✅ | — | — | — | — | — |
+| Enterprise SLA | — | — | — | ✅ | — | ✅ (Provisioned) |
+| OpenAI SDK drop-in | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Native Python SDK | ✅ (perf client) | ✅ (fireworks-ai) | ✅ (huggingface_hub) | — | ✅ (runpod) | ✅ (together) |
+| Native CLI | ✅ (baseten) | ✅ (firectl) | ✅ (hf) | — | — | ✅ (tg/together) |
+| OpenAPI spec published | ✅ | — | ✅ | ✅ | ✅ | ✅ |
 
 ---
 # LAYER 2 — MODEL INFERENCE & INTELLIGENCE APIs
@@ -4623,6 +4796,7 @@ config/read | value/write | batchWrite | configRequirements/read
 
 **Module — store Parameter**
 - Service: `store` boolean controlling whether response/application state is retained (OAI `store`; Goo `store` on generateContent/Interactions; Mst not exposed as request param). *Providers*: OAI, Goo.
+- Service: Google per-API defaults — `generateContent` defaults `store=false`; Interactions API defaults `store=true`; toggling Interactions logging off disables automatic history storage/retrieval unless overridden per request (Goo). *Providers*: Goo.
 
 **Module — Encryption at Rest**
 - Service: CMEK / EKM encrypt at rest with own KMS key (Ant CMEK requires cross-account key policy; OAI EKM lists eligible KMS providers). *Providers*: Ant, OAI.
@@ -4782,6 +4956,21 @@ config/read | value/write | batchWrite | configRequirements/read
 - Service: `runInParallel` false = blocking sequential stops main agent if tripped, true = parallel lower latency speculative work (OAI). *Providers*: OAI.
 - Service: Tripwire boolean signaling guardrail blocked (`tripwireTriggered`/`tripwire_triggered` OAI). *Providers*: OAI.
 
+**Module — Guardrail Workflow Boundaries**
+- Service: Input guardrails run only for the first agent in a chain; output guardrails run only for the final-output agent; tool guardrails run only on their attached tool — for per-tool validation in manager-style workflows attach validation to the tool not the agent (OAI). *Providers*: OAI.
+- Service: The decision to use a multi-agent architecture should be driven by evals (L5.L.6) — starting multi-agent adds unnecessary complexity (OAI best practices). *Providers*: OAI.
+
+**Module — Guardrail Response Shapes**
+- Service: Mistral guardrail success response includes a `guardrails` field with per-category `score`/`violated`; blocked response is HTTP 403 with `decisions` per category (threshold, score, violated) (Mst). *Providers*: Mst.
+- Service: Google `promptFeedback` — if `blockReason` is set, the prompt was blocked and no candidates are returned; block reasons: `BLOCK_REASON_UNSPECIFIED`/`SAFETY`/`OTHER`/`BLOCKLIST`/`PROHIBITED_CONTENT`/`IMAGE_SAFETY`; `safetyRatings[]` included (Goo). *Providers*: Goo.
+- Service: Anthropic AUP — Claude's built-in harmlessness training (AUP) may flag content deemed dangerous regardless of your prompt (Ant). *Providers*: Ant.
+
+**Module — Output Moderation via Prompting (Anthropic)**
+- Service: Same Messages-API prompting pattern as input moderation, applied to the generated text on the output side (Ant). *Providers*: Ant.
+
+**Module — Google Logging Limitations**
+- Service: Not loggable — Imagen, Veo, embedding, Robotics models; inputs containing videos, GIFs, or PDFs; Public Preview Agents in the Gemini API (Goo). *Providers*: Goo.
+
 **Module — Moderation Categories**
 - Service: Mistral 11 fixed: Sexual, Hate and Discrimination, Violence and Threats, Dangerous, Criminal, Self-Harm, Health, Financial, Law, PII, **Jailbreaking**. *Providers*: Mst.
 - Service: Google 4 adjustable + built-in: Harassment, Hate speech, Sexually explicit, Dangerous; built-in non-adjustable child safety, prohibited content. *Providers*: Goo.
@@ -4790,7 +4979,7 @@ config/read | value/write | batchWrite | configRequirements/read
 
 **Module — Decision Granularity**
 - Service: Binary `violation:bool` (Ant, Mst `violated`). *Providers*: Ant, Mst.
-- Service: Multi-level integer risk 0-3 (Ant `risk_level`). *Providers*: Ant.
+- Service: Multi-level integer risk 0-3 (Ant `risk_level`); scale definitions: 0 = No risk, 1 = Low, 2 = Medium, 3 = High (Ant). *Providers*: Ant.
 - Service: Probability enum + numeric probability/severity scores (Goo `SafetyRating` `category`/`probability` HIGH/MEDIUM/LOW/NEGLIGIBLE/`probabilityScore`/`severity`/`severityScore`/`blocked`). *Providers*: Goo.
 - Service: Classification label set (Mst Judge CLASSIFICATION; OAI grader labels). *Providers*: Mst, OAI.
 
@@ -4809,6 +4998,7 @@ config/read | value/write | batchWrite | configRequirements/read
 
 **Module — Approval Flow**
 - Service: Resumable serialized state `state.approve()` + resume `run(agent, state)` (OAI). *Providers*: OAI.
+- Service: Guardrails (automatic) and approvals (human) share the same resumable `state` model (OAI). *Providers*: OAI.
 - Service: Permission events + hooks (Ant `tool_decision`, `permission_mode_changed`, `blocked_on_user`). *Providers*: Ant.
 - Service: Human reviewers alter/block content (Goo guidance). *Providers*: Goo.
 - Service: `confirmation_status:pending` + `tool_confirmations[]` / `DeferredToolCallsException` (Mst). *Providers*: Mst.
@@ -4856,10 +5046,24 @@ config/read | value/write | batchWrite | configRequirements/read
 **Module — Hosted Dashboards**
 - Service: OpenAI Traces (built-in enabled by default); Mistral Explorer (Enterprise always-on for workspace); Google AI Studio Logs (paid tier billing-enabled project). *Providers*: OAI, Mst, Goo.
 
+**Module — SDK / CLI Telemetry Mechanics**
+- Service: SDK produces no telemetry itself; it forwards config to the CLI child process which instruments and exports (Ant). *Providers*: Ant.
+- Service: `console` exporter not usable through the SDK (stdout is the message channel); use a local OTLP collector or Jaeger for local inspection (Ant). *Providers*: Ant.
+- Service: Administrators can centrally configure telemetry via managed settings `env` block (MDM-distributed), high precedence, not user-overridable (Ant). *Providers*: Ant.
+- Service: Export intervals & flush — on clean exit, flush within a bounded timeout; spans can be dropped if the collector is slow; buffered data is lost on kill (Ant). *Providers*: Ant.
+
 ### Product L5.L.2 — Identity, Resource Attribution & Tenancy Configuration
 
 **Module — Resource Attributes**
 - Service: `service.name` `OTEL_SERVICE_NAME`; `resource_attributes` `OTEL_RESOURCE_ATTRIBUTES` comma-separated key=value; `enduser.id`/`tenant.id`/`user.account_uuid`/`user.id`/`user.email`/`user.groups`/`identity.source`/`app.version`/`app.entrypoint`/`terminal.type` (Ant); `metadata.user_id` opaque external user id no PII abuse detection (Goo); `metadata` custom key-value per-request filterable in Explorer (Mst); `api_agent_id` ID of agent that handled request (Mst); `correlation_id` cross-system tracing identifier (Mst); `organization.id`/`prompt.id`/`workflow.run_id`/`workflow.name`/`workspace.host_paths` (Ant); `include_resource_attributes`/`include_session_id`/`include_account_uuid`/`include_version`/`include_entrypoint` bool controls (Ant). *Providers*: Ant, Goo, Mst.
+
+**Module — Gateway OIDC Identity**
+- Service: When the agent calls through an identity-provider gateway, identity is stamped from the OIDC session — `user.id` = IdP subject, `user.email`, `user.groups`, `identity.source:gateway-oidc` — and these override env-supplied `user.*`/`identity.*` values (Ant). *Providers*: Ant.
+
+**Module — Attribute Behavior & Formatting**
+- Service: Built-in standard attributes always win on collision with custom keys (Ant). *Providers*: Ant.
+- Service: `OTEL_RESOURCE_ATTRIBUTES` formatting — no spaces; values can't contain whitespace, double quotes, commas, semicolons, backslashes, or control chars; percent-encode as needed (Ant). *Providers*: Ant.
+- Service: Per-call injection via `env` in `ClaudeAgentOptions`/`options.env` with percent-encoded values (Ant). *Providers*: Ant.
 
 **Module — Cardinality Discipline**
 - Service: Custom keys become labels on every metric series; high-cardinality values inflate storage; exclude custom attributes from datapoint labels (`OTEL_METRICS_INCLUDE_RESOURCE_ATTRIBUTES=false`). *Providers*: Ant.
@@ -4904,7 +5108,26 @@ config/read | value/write | batchWrite | configRequirements/read
 - Service: Access Transparency — log of every access to your data by staff/systems, plus preservation events (Ant). *Providers*: Ant.
 
 **Module — Sensitive-Content Gating**
-- Service: `OTEL_LOG_USER_PROMPTS`, `OTEL_LOG_TOOL_CONTENT`, `OTEL_LOG_RAW_API_BODIES` etc. (Ant); data-use policy opt-in sharing (Goo); Enterprise gating (Mst); tracing scope controls (OAI). *Providers*: per platform.
+- Service: Telemetry is structural by default (durations, model names, tool names, token counts when API returns usage); content read/written by the agent is not recorded by default (Ant). *Providers*: Ant.
+- Service: `OTEL_LOG_USER_PROMPTS=1` — prompt text on `claude_code.user_prompt` events and `claude_code.interaction` span (Ant). *Providers*: Ant.
+- Service: `OTEL_LOG_ASSISTANT_RESPONSES=1` — assistant response text on `assistant_response` events (falls back to `OTEL_LOG_USER_PROMPTS`; v2.1.193+) (Ant). *Providers*: Ant.
+- Service: `OTEL_LOG_TOOL_DETAILS=1` — tool input args (file paths, shell commands, search patterns, skill names, MCP names) on `tool_result` events / span attrs (Ant). *Providers*: Ant.
+- Service: `OTEL_LOG_TOOL_CONTENT=1` — full tool input/output bodies as span events on `claude_code.tool` (truncated 60 KB); requires tracing (Ant). *Providers*: Ant.
+- Service: `OTEL_LOG_RAW_API_BODIES` — full Messages API request/response JSON as `api_request_body`/`api_response_body` log events; `1`=inline truncated 60 KB; `file:<dir>`=untruncated on disk with `body_ref` path; implies consent to everything the three flags above reveal; extended-thinking content redacted (Ant). *Providers*: Ant.
+- Service: Leave all flags unset unless your observability pipeline is approved to store the data the agent handles (Ant). *Providers*: Ant.
+- Service: Data-use policy opt-in sharing (Goo); Enterprise gating (Mst); tracing scope controls (OAI). *Providers*: per platform.
+
+**Module — Google Data-Use & Sharing Policy**
+- Service: Default: prompts/responses within logs not used for product improvement/development (Goo). *Providers*: Goo.
+- Service: Sharing a dataset with Google opts it into "Unpaid Services" data-use terms (may be used for training/evaluation, including human review) (Goo). *Providers*: Goo.
+- Service: Google disconnects data from Account/API key/Cloud project before reviewers see/annotate it (Goo). *Providers*: Goo.
+- Service: License extends to prompts (incl. system instructions, cached content, files) and generated responses (Goo). *Providers*: Goo.
+
+**Module — Enterprise Gating & Beta Allowlist**
+- Service: Mistral entire Observability suite (Explorer, Judges, Campaigns, Datasets) is Enterprise-tier only; SDK under `mistral.beta.observability.*`; Moderation API and Custom Guardrails available to standard users (Mst). *Providers*: Mst.
+- Service: Google logs storage requires paid tier (billing-enabled project); safety settings/feedback available to standard users (Goo). *Providers*: Goo.
+- Service: Anthropic tracing beta may require org allowlist in interactive CLI (not gated in Agent SDK / `-p` sessions) (Ant). *Providers*: Ant.
+- Service: OpenAI tracing built-in and enabled by default; legacy Evals platform deprecated (read-only Oct 31 2026; shutdown Nov 30 2026) (OAI). *Providers*: OAI.
 
 ### Product L5.L.5 — Search, Filter & Inspect Production Traffic
 
@@ -4913,24 +5136,50 @@ config/read | value/write | batchWrite | configRequirements/read
 - Service: Mistral observability search endpoints — `POST /v1/observability/logs/search`, `POST /v1/observability/traces/search`, `GET /v1/observability/traces/{id}`, `GET /v1/observability/traces/{id}/spans/{id}` (Mst). *Providers*: Mst.
 - Service: Workflow events — `GET /v1/workflows/events` listable with cursor pagination (Mst). *Providers*: Mst.
 
+**Module — Mistral Explorer Filter Language**
+- Service: Structured filter condition object `{field, op, value}`; combine with `{"AND":[...]}` / `{"OR":[...]}` trees; operators `=`/`eq`, `!=`/`ne`, `contains`, `includes`, `excludes`, `>`/`gt`, `<`/`lt`, `>=`/`gte`, `<=`/`lte`, `isnull`, `length_equals`, `starts_with`, `ends_with`, `matches` (regex) (Mst). *Providers*: Mst.
+- Service: Event fields filterable — `timestamp`, `model_name`, `last_user_message_preview`, `response_messages_preview`, `invoked_tools` (list), `total_time_elapsed` (s), `input_tokens`, `output_tokens`, `api_agent_id`, `event_id`, `correlation_id`, `first_system_message`, `metadata` (Mst). *Providers*: Mst.
+- Service: SDK search — `mistral.beta.observability.chat_completion_events.search(search_params={filters:...}, extra_fields=[...], page_size=...)` (Mst). *Providers*: Mst.
+- Service: Query design tips — start broad (time range) → add one business condition (tool/model/topic) → add one technical condition (latency/content) → scan before exporting; treat exports as snapshots (descriptive names e.g. `support_web_search_2026_02`) (Mst). *Providers*: Mst.
+- Service: Explorer restricted to Workspace administrators (Enterprise); seed a Judge/Campaign from a filter; export filtered slices to Datasets (Mst). *Providers*: Mst.
+
+**Module — Anthropic OTel Backend Queries**
+- Service: Filter on `session.id` in your OTLP backend to see related `query()` calls as one timeline (Ant). *Providers*: Ant.
+- Service: AI Studio Logs page — filter bar; reverse-chronological; click entry for payload preview (full prompt, response, prior-turn context); Interactions entries link to `previous_interaction_id` (Goo). *Providers*: Goo.
+- Service: OpenAI Traces dashboard — Logs > Traces; inspect a representative workflow trace (OAI). *Providers*: OAI.
+
 ### Product L5.L.6 — Evaluation & Scoring (Judges / Graders / Campaigns / Evals)
 
+**Module — Maturity Progression**
+- Service: OpenAI progression — traces (debug) → trace grading (graders score traces) → datasets & eval runs (repeatable, comparable) (OAI). *Providers*: OAI.
+- Service: Mistral loop — Explorer → Judges → Campaigns → Explorer (filter by annotations) → Datasets → (re-run / improve) (Mst). *Providers*: Mst.
+
 **Module — Judge / Scorer**
-- Service: Mistral Judge (CLASSIFICATION or REGRESSION, Jinja2 instructions, model scores outputs against rubrics). *Providers*: Mst.
-- Service: OpenAI Grader (trace grader; LLM-as-a-judge / model grader with rubrics). *Providers*: OAI.
+- Service: Mistral Judge — `mistral.beta.observability.judges.create(name, description, model_name, instructions, output, tools)`; `output` = CLASSIFICATION `{type, options:[{value,description}]}` or REGRESSION `{type, min, max, min_description, max_description}`; `tools` optional (Web Search, Code Interpreter), `[]` for none; `model_name` evaluation model (`mistral-medium-latest`, `mistral-small-latest`, …); conversation history, user message, assistant response, available tools auto-injected; Jinja2 vars `{{ conversation_history }}`/`{{ user_message }}`/`{{ assistant_message }}`/`{{ system_prompt }}`/`{{ available_tools }}`/`{{ answer_type_definition }}`/`{{ properties.* }}` (Mst). *Providers*: Mst.
+- Service: OpenAI Grader — trace grader; LLM-as-a-judge / model grader with rubrics; scores traces with structured criteria (did agent pick right tool? did handoff happen when should? did workflow violate policy?); created from Logs > Traces (OAI). *Providers*: OAI.
 - Service: Anthropic classification cookbook. *Providers*: Ant.
 - Service: Google safety classifier; LLM-as-judge in guidance. *Providers*: Goo.
-- Service: Metric-based (ROUGE, exact match, function-call accuracy). *Providers*: OAI best practices.
-- Service: Human labelers. *Providers*: Goo guidance, OAI human evals.
+- Service: Metric-based (exact match, ROUGE/BLEU, function-call accuracy, executable evals). *Providers*: OAI best practices.
+- Service: Human labelers (rank/grade 1–5, consensus votes, "show rather than tell"). *Providers*: Goo guidance, OAI human evals.
+
+**Module — Evaluator Types & Biases (OpenAI best practices)**
+- Service: LLM-as-a-judge subtypes — pairwise comparison, single-answer grading, reference-guided grading; watch position bias and verbosity bias; prefer pairwise or pass/fail; use most capable model; add CoT before scoring (OAI). *Providers*: OAI.
+- Service: Architecture-aware evals — single-turn → instruction following + functional correctness; workflows → per-step + end-to-end; single-agent → add tool selection + data precision (correct arguments extracted from history); multi-agent → add agent handoff accuracy (triage decision boundaries) (OAI). *Providers*: OAI.
+- Service: No strategy is perfect — combine evaluator types; expert human ground-truth labels are expensive/slow (OAI best practices). *Providers*: OAI.
 
 **Module — Eval Runs / Campaigns**
-- Service: Mistral Campaign (one Judge over filtered events, background). *Providers*: Mst.
-- Service: OpenAI Eval run (over a dataset); legacy Evals API deprecated. *Providers*: OAI.
+- Service: Mistral Campaign — `mistral.beta.observability.campaigns.create(name, description, judge_id, search_params, max_nb_events)`; `max_nb_events` 100–10,000; background async (close the tab, check dashboard later); annotations written back into Explorer linked to original events; `fetch_status()`, `list_events()`; filter cannot change after start; deleting a Campaign does not necessarily lose annotations (Mst). *Providers*: Mst.
+- Service: OpenAI Eval run (over a dataset); for advanced features use the Evals API (deprecated: read-only Oct 31 2026, shutdown Nov 30 2026 → migrate to Promptfoo) (OAI). *Providers*: OAI.
 - Service: Google Batch API re-run of curated dataset. *Providers*: Goo.
-- Service: Continuous evaluation CE on every change (OpenAI best practices). *Providers*: OAI.
+- Service: Continuous evaluation (CE) — run evals on every change; monitor for new nondeterminism; grow the eval set over time (OAI best practices). *Providers*: OAI.
 
 **Module — Trace Grading**
-- Service: Scoring individual end-to-end traces with structured criteria (did agent pick right tool? did handoff happen when should?). *Providers*: OAI.
+- Service: Scoring individual end-to-end traces with structured criteria (did agent pick right tool? did handoff happen when should? did workflow violate policy?) (OAI). *Providers*: OAI.
+- Service: Trace-grading workflow — Logs > Traces → inspect trace → create grader → run against traces → refine prompts/tools/routing/guardrails (OAI). *Providers*: OAI.
+
+**Module — Judge & Campaign Best Practices**
+- Service: A Judge uses a single output type; classification options each need `value` + `description`; be specific in instructions; never assume the Judge understands your context; use boundary examples (Mst). *Providers*: Mst.
+- Service: Validate a Judge on 10–20 real records before scaling; validate on a single record before launching a full Campaign (fastest feedback loop) (Mst, OAI). *Providers*: Mst, OAI.
 
 **Module — Evaluation & Testing (IBM watsonx)**
 - Service: CSV upload → run → export; `POST /test_case` upload, `POST /evaluate`, `GET /evaluations`, `POST /evaluations/export`; rubric evaluations, LLM agent vulnerability testing (adversarial/red-team). *Providers*: IBM.
@@ -4993,22 +5242,52 @@ POST /v1/attestation/generate   # opt-in via requestAttestation capability
 ### Product L5.L.7 — Datasets, Curation & Re-runs
 
 **Module — Dataset**
-- Service: Google Dataset (curated logs, no expiry, ≤1000/project). *Providers*: Goo.
-- Service: Mistral Dataset (records = conversation + properties + source, JSONL import/export). *Providers*: Mst.
-- Service: OpenAI Dataset (golden set, eval runs). *Providers*: OAI.
-- Service: Anthropic manual no dedicated surface. *Providers*: Ant.
+- Service: Google Dataset (curated logs, no expiry, ≤1000/project; export to CSV/JSONL/Google Sheets; re-run with Batch API; use cases: challenge sets, sample sets, evaluation sets). *Providers*: Goo.
+- Service: Mistral Dataset — `mistral.beta.observability.datasets.create(name, description)`; record = Conversation + Properties + Source; sources: `EXPLORER`/`UPLOADED_FILE`/`DIRECT_INPUT`/`PLAYGROUND`; editable (fix messages, add expected outputs, remove duplicates); add records, `import_from_explorer()`, list records, export to JSONL (Mst). *Providers*: Mst.
+- Service: OpenAI Dataset (golden set, eval runs, expected outputs / labels). *Providers*: OAI.
+- Service: Anthropic manual no dedicated surface (manual curation). *Providers*: Ant.
 
 **Module — Record Metadata**
-- Service: Mistral Properties (`expected_output`, `category`, `grading_guidance`, `difficulty`). *Providers*: Mst.
+- Service: Mistral Properties (`expected_output`, `category`, `grading_guidance`, `difficulty`) — referenced by Judges via `{{ properties.* }}`. *Providers*: Mst.
 - Service: OpenAI golden-set labels / expected outputs. *Providers*: OAI.
 
 **Module — Dataset Ingest**
 - Service: From production traffic/logs (all); Manual entry (Mst); JSONL file upload (Mst); From Playground / Campaign (Mst). *Providers*: per platform.
 
+**Module — Mistral JSONL Import Format**
+- Service: One record per line: `{"messages":[{"role":"user","content":"..."},{"role":"assistant","content":"..."}],"properties":{"expected_output":"...","category":"..."}}` (Mst). *Providers*: Mst.
+
+**Module — Campaign→Dataset Flow**
+- Service: `campaigns.list_events()` then `datasets.import_from_explorer()` (Mst). *Providers*: Mst.
+- Service: Mistral imports may take time — check Import Tasks status (Mst). *Providers*: Mst.
+
+**Module — Dataset Best Practices**
+- Service: Explicit names with scope/date (e.g. `support_billing_baseline_2025_06`); track sources/curation; version baselines; don't mix unrelated tasks; check class balance; freeze baseline between uses (OAI best practices). *Providers*: OAI.
+
 ### Product L5.L.8 — Production Monitoring & Improvement Loop
 
 **Module — Improvement Loop**
 - Service: Observe → moderate → approve → record → score → curate datasets → re-run → improve (prompts, routing, fine-tuning). *Providers*: all.
+- Service: Google iterative cycle — understand risks → adjust/test (repeat until performance appropriate) → monitor in production (Goo). *Providers*: Goo.
+- Service: Mistral Observability loop — Explorer → Judges → Campaigns → Explorer (filter by annotations) → Datasets → (re-run / improve) (Mst). *Providers*: Mst.
+
+**Module — Safety Benchmarking & Adversarial Testing**
+- Service: Safety benchmarking — design safety metrics, test against eval datasets, define minimum acceptable levels (Goo). *Providers*: Goo.
+- Service: Adversarial testing — proactively try to break the app; diverse test data; automated red-team LLM to find inputs eliciting harmful outputs (Goo; OAI best practices). *Providers*: Goo, OAI.
+
+**Module — Production Monitoring**
+- Service: Monitored user-feedback channel (thumbs up/down); user studies with diverse users; especially when usage patterns differ from expectations (Goo). *Providers*: Goo.
+
+**Module — Mitigation Techniques (Google, mostly application-side)**
+- Service: Blocklists; trained classifiers labeling prompts for harms/adversarial signals; unique user IDs + per-user volume limits; prompt-injection safeguards; scope-narrowing (narrower tasks, more human oversight); adjust safety settings (Goo). *Providers*: Goo.
+- Service: Grounding with Google Search for factuality — verifiable citations beyond knowledge cutoff; disable for creative non-information-seeking use cases (Goo). *Providers*: Goo.
+
+**Module — Eval-Driven Development (OpenAI best practices)**
+- Service: Evaluate early and often; log everything to mine for eval cases; automate scoring; calibrate with human feedback; treat evaluation as a continuous journey (OAI). *Providers*: OAI.
+- Service: Data flywheel — once evals mature, feed eval data into reinforcement fine-tuning to improve the application (OAI). *Providers*: OAI.
+
+**Module — Moderation Analysis (Anthropic)**
+- Service: Analyze moderated content to identify trends; continuously evaluate with precision/recall tracking; iteratively refine prompts, keywords, criteria (Ant). *Providers*: Ant.
 
 **Module — Privacy / Data-Use**
 - Service: Sensitive-content opt-in flags (Ant); Opt-in sharing under "Unpaid Services" terms with account/key/project disconnection (Goo); Enterprise gating (Mst); Tracing scope reduction (OAI). *Providers*: per platform.
@@ -5051,7 +5330,7 @@ POST /v1/attestation/generate   # opt-in via requestAttestation capability
 **Module — Deprecated Endpoints (OpenAI selected)**
 - Service: `POST /v1/prompts` shutdown Nov 30 2026 → migrate prompt content into application code (OAI). *Providers*: OAI.
 - Service: Assistants API (whole) sunset Aug 26 2026 → Responses API / Conversations API (OAI). *Providers*: OAI.
-- Service: Evals platform shutdown Nov 30 2026 → Promptfoo (OAI). *Providers*: OAI.
+- Service: Evals platform read-only Oct 31 2026, shutdown Nov 30 2026 → Promptfoo (OAI). *Providers*: OAI.
 - Service: Agent Builder shutdown Nov 30 2026 → Agents SDK / ChatGPT Workspace Agents (OAI). *Providers*: OAI.
 - Service: Self-serve fine-tuning (new job creation) shutdown Jan 6 2027 → inference continues until base model deprecated (OAI). *Providers*: OAI.
 
