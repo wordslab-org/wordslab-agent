@@ -22,8 +22,9 @@ These are picked at the platform level, not per domain, because they form the sh
 
 | Concern | Choice | Rationale (mid-2026) |
 |---|---|---|
-| Primary language | **Python 3.12** (services + SDKs) + **Go** (data-plane gateways, hot paths) | Python ecosystem for AI/ML; Go for low-latency routing, rate-limit, MCP tunnels. |
-| Service framework | **FastAPI** (Python) + **Fiber/Echo** (Go) | Async, OpenAPI 3.1 first-class, streaming native. |
+| Primary language | **Decided via ADR-0001 — two viable stacks:** **Option A (default):** Python 3.12 (services + SDKs) + Go (data-plane gateways, hot paths). **Option B (bank-sovereign):** C# / .NET 10 LTS (L0 control plane + L2 Responses/Interactions + L4 agent orchestration + L5 admin/evals) + Python sidecars (L1 inference engines + L3 modality services) + optional Go for the hottest data-plane paths. | Both stacks satisfy sovereignty (OSS, Linux-hostable). Option A maximizes AI-ecosystem native depth; Option B maximizes BFSI mission-critical fit and auditable runtime governance. Final pick is evidence-based via the Phase-0 spike (see §4 Phase 0). *Rejected:* Mojo as a platform language (beta, closed-source compiler, thin stdlib, single-vendor + Qualcomm-acquisition risk, no BFSI track record, no regulatory tooling) — recorded in ADR-0002; allowed only as a kernel-only experiment under Track T4. |
+| Service framework | **FastAPI** (Python, Option A) + **Fiber/Echo** (Go) **or** **ASP.NET Core** (Option B, minimal APIs + OpenAPI + SignalR + gRPC) | Async, OpenAPI 3.1 first-class, streaming native; both options cover the requirement. |
+| Agent framework (in-process) | **OpenAI Agents SDK** + **LangGraph** (Option A) **or** **Microsoft Agent Framework 1.0** (Option B — also Python-parity) | Versioned agents, handoffs, agents-as-tools, MCP/A2A native (MAF), sessions/threads/HITL/OTel. Custom releases/overrides layer on top. Option B has a near-1:1 L4 match via MAF (GA April 3, 2026). |
 | Metadata DB | **PostgreSQL 16** + **pgvector**, **pgcrypto**, row-level security | Tenancy, sessions, agents, releases, catalog, vector (small), audit hashchain. Single operational surface. |
 | Cache / queues / SSE cursors | **Redis 7** (Streams, Streams `XADD`/`XREAD` for resumable SSE) | Rate-limit token buckets, last_event_id cursors, ephemeral session state. |
 | Object storage | **MinIO** (S3-compatible, multipart + lifecycle) | Resumable upload = S3 multipart; BYOB trivial; `expires_after` native. |
@@ -47,6 +48,48 @@ These are picked at the platform level, not per domain, because they form the sh
 
 ### Decision log discipline
 Every row above gets an entry in `implementation/decisions/ADR-NNNN-*.md` recording: date, options evaluated, evidence links, choice, expected revisit date. Re-evaluate every 6 months or when a major upstream release lands.
+
+### §1.1 Primary language — ADR-0001 (options carried forward) & ADR-0002 (Mojo rejected)
+
+**ADR-0001 — Primary implementation language (status: options carried forward, decided via Phase-0 spike).**
+
+Two stacks are viable and both OSS-sovereignty-compliant. The choice is deferred to an evidence-based spike rather than asserted.
+
+**Option A — Python-primary (default if no banking-sovereignty constraint dominates):**
+- Services: Python 3.12 + FastAPI; data plane: Go (Fiber/Echo) for gateways, rate-limit, MCP tunnels.
+- ✅ Deepest native AI/ML ecosystem (vLLM, SGLang, Docling, LlamaIndex, LightRAG, ComfyUI, faster-whisper, Pipecat, Langfuse server).
+- ✅ One cross-language boundary (Python↔Go).
+- ⚠️ Python is less universally trusted as a BFSI mission-critical runtime than .NET/Java (no FIPS-validated crypto story, weaker static typing, GIL).
+- ⚠️ Talent: available but more ML-oriented than enterprise-runtime-oriented.
+
+**Option B — C#/.NET-primary (preferred when bank-sovereignty + mission-critical governance dominate):**
+- Control plane + L2 Responses/Interactions + L4 agent orchestration + L5 admin/evals: C# / .NET 10 LTS + ASP.NET Core + .NET Aspire + (optional) Dapr.
+- AI engines (L1) + modality services (L3): Python sidecars (vLLM, SGLang, TEI, ComfyUI, faster-whisper, Pipecat, Docling, LlamaIndex, LightRAG) called over HTTP/gRPC/WebSocket — stateless, replaceable, no business logic in Python.
+- Optional Go for the hottest data-plane paths only if .NET 10 native-AOT benchmarks miss a V4 SLO.
+- ✅ Proven BFSI runtime (25-yr track record; Experian/Red Hat/Keyhole/Azati case studies; FIPS-validated crypto on Windows; regulator-familiar).
+- ✅ Fully OSS (MIT, .NET Foundation, Linux-first) — satisfies project goal #1 (sovereignty) with no single-vendor lock-in; Azure is *available*, not *required*.
+- ✅ Microsoft Agent Framework 1.0 (GA April 3, 2026, .NET + Python parity, MCP + A2A native) is a near-1:1 match for L4.A/C/D/G/I/J spec.
+- ✅ Deep hireable talent pool in every financial center; cheaper than Rust/Go specialists in many markets.
+- ✅ LTS lifecycle (3 yrs), Microsoft support contracts, predictable Nov yearly releases.
+- ⚠️ AI/ML OSS is Python-first; SDKs for new model releases lag Python by days/weeks; some integrations (ComfyUI, Pipecat) are sidecars by necessity.
+- ⚠️ Adds one (sometimes two) cross-language boundaries (C#↔Python; optional C#↔Go).
+
+**Decision mechanism — Phase-0 spike (added to §4 Phase 0):**
+2-week build of the same vertical slice (`/v1/agents` CRUD + `/v1/sessions` create + `/v1/chat/completions` served by vLLM + SSE streaming + HITL approval pause/resume) in **both** Option A and Option B. Scored against:
+- V1 (S.1/S.4/S.5/S.7/S.10/S.11 conformance) — must pass.
+- V4 (Chat Completions p95, TTFT, session create p95) — must meet target.
+- Engineering velocity (time-to-slice, lines of glue, deps pulled in).
+- BFSI reviewer checklist (FIPS crypto path, audit log, OTel completeness, talent-availability survey).
+The higher-scoring stack is adopted platform-wide; the other is documented as the documented fallback if the chosen stack regresses on sovereignty/maturity.
+
+**ADR-0002 — Mojo as platform language (status: rejected).**
+Researched mid-2026; recorded for traceability. Mojo (Modular Inc.) evaluated and rejected as a *platform* implementation language for this project. Findings:
+- Mojo 1.0.0b2 (June 18, 2026) is **beta**, not GA; compiler **closed source** (Modular Community License — proprietary); full open-source promised "fall 2026" but unverified. Qualcomm's ~$3.9B acquisition of Modular (June 2026) adds acquisition risk to that promise.
+- Roadmap phase = "high-performance CPU/GPU kernels." Broader systems programming and dynamic/Python-style features explicitly deferred.
+- Stdlib too thin for general-purpose services: no mature HTTP framework (Lightbug, 737★, **archived May 12, 2026**; community HTTP/JSON/CLI/date libs are single-author and fragmented), no production Postgres/Redis/MinIO drivers, no Temporal/Langfuse/Svix/Keycloak/Vault/MCP SDKs, no structured-output/JSON-schema tooling, no bank-grade crypto/mTLS stack.
+- No BFSI/regulatory track record; no FIPS-validated runtime; no audited APM; tiny talent pool; beta language with acquisition in flight = strategic-bet risk unacceptable for systems-of-record.
+- Honest mid-2026 consensus (BirJob, uvik scorecard): *"stdlib is too thin to use as a primary language for general work… bookmark + watch the fall 2026 open-source release."* Mojo is positioned by upstream (BentoML/Modular MAX) as a **complement to Python for hot kernels**, not a service language.
+**Allowed narrow use:** Mojo permitted **only as a kernel-only experiment** under Track T4 / L1.D — a 2-week Phase-1 spike replacing one vLLM/custom CUDA kernel with a Mojo kernel via Modular MAX, measured against the CUDA baseline. Gate: ≥10% throughput or ≥20% latency improvement at equal accuracy *and* packaging/integration cost < 1 engineer-week. If it fails, drop it; if it wins, it stays a **kernel plugin called from the Python/.NET host**, never a service language. Revisit annually post fall-2026 open-source release and once a stable 1.0 GA + 12 months of production track record exists elsewhere.
 
 ---
 
@@ -114,7 +157,7 @@ Each track produces a **track report** (`implementation/tracks/Tn-*.md`) with: (
 
 ### Track T7 — L4 agent orchestration
 **Scope:** L4.A Agent definition, L4.B Models (agent-level), L4.C Sessions, L4.D Loop/events, L4.E Tools, L4.F Connectors/MCP, L4.G Permissions/approvals, L4.H Hooks, L4.I Multi-agent, L4.J Memory/RAG, L4.K Workflows, L4.L Channels, L4.M Plugins/marketplace, L4.N Webhooks.
-**OSS to validate:** OpenAI Agents SDK vs LangGraph for sessions/threads/fork/steer/interrupt; MCP reference SDKs + FastMCP + mcp-go for connectors; mem0 vs Letta for memory store + versions + redaction; LiveKit/Pipecat for voice channel; CrewAI/AutoGen/Magentic-One for multi-agent (benchmark handoff accuracy).
+**OSS to validate:** OpenAI Agents SDK vs LangGraph vs **Microsoft Agent Framework 1.0** (GA April 3, 2026, .NET+Python parity, MCP/A2A native, near-1:1 L4 match — primary candidate if ADR-0001 selects Option B) for sessions/threads/fork/steer/interrupt; MCP reference SDKs + FastMCP + mcp-go + **ModelContextProtocol .NET SDK** for connectors; mem0 vs Letta for memory store + versions + redaction; LiveKit/Pipecat for voice channel; CrewAI/Magentic-One for multi-agent (benchmark handoff accuracy; note AutoGen is in maintenance mode — successors live in MAF).
 **Custom scope (core platform IP, second-largest track):**
 - **Agent registry** — Postgres with `version` optimistic concurrency, releases table, deploy-to-environment binding.
 - **Sessions service** — Postgres JSONL or `SessionStore` adapter (S3/Redis), threads per session, two-step lifecycle, `previous_interaction_id` continuity.
@@ -191,10 +234,11 @@ Each phase ends with a working vertical slice, a written evaluation against V1�
 
 ### Phase 0 — Foundations & decisions (4–6 weeks)
 - Stand up shared infra: Postgres+pgvector, Redis, MinIO, Temporal, Keycloak, Vault, OTel Collector, Loki/Tempo/Prometheus, Langfuse.
-- Write ADRs for every core-stack row.
+- Write ADRs for every core-stack row, **including ADR-0001 (primary language) and ADR-0002 (Mojo rejection) from §1.1**.
 - Generate initial SDKs from `api.md` (Speakeasy/Fern).
 - Deliverable: empty but conformant `identity-svc`, `tenancy-svc`, `files-svc`, `gateway-svc` returning S.4-compliant errors.
-- Gate: V1 green for S.1/S.4/S.5 on the four services.
+- **Primary-language spike (2 weeks, in parallel with the above):** build the same vertical slice — `/v1/agents` CRUD + `/v1/sessions` create + `/v1/chat/completions` served by vLLM + SSE streaming + HITL approval pause/resume — in **both** Option A (Python+FastAPI+Go gateway) and Option B (C#/.NET 10 + ASP.NET Core + Microsoft Agent Framework + vLLM Python sidecar). Score both against V1 (S.1/S.4/S.5/S.7/S.10/S.11) + V4 (Chat Completions p95, TTFT, session-create p95) + engineering velocity + BFSI reviewer checklist (FIPS crypto path, audit log, OTel completeness, talent-availability survey). Adopt the higher-scoring stack platform-wide; document the other as the documented fallback. This converts ADR-0001 from "options carried forward" to "decided".
+- Gate: V1 green for S.1/S.4/S.5 on the four services; **ADR-0001 status flipped to "decided" with spike evidence attached**.
 
 ### Phase 1 — L0 + L1 serving vertical (10–12 weeks)
 - Tracks T1, T2, T4 to MVP.
@@ -238,7 +282,7 @@ Each phase ends with a working vertical slice, a written evaluation against V1�
 
 ---
 
-## 5. Risk register (top 10)
+## 5. Risk register (top 12)
 
 | # | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|---|
@@ -252,6 +296,8 @@ Each phase ends with a working vertical slice, a written evaluation against V1�
 | R8 | S.19 strict-mode schema limits vary across engines | High | Medium | Build a per-engine conformance matrix in T5; reject unsupported keywords with explicit 400. |
 | R9 | Encrypted reasoning replay breaks across model versions | High | High | Pin model + version on stored reasoning blobs; refuse cross-model replay with 400 (per S.18). |
 | R10 | OSS license/availability shifts mid-project (e.g., Svix, Langfuse) | Medium | High | V5 monthly review; maintain a fallback shortlist per core-stack row in ADRs. |
+| R11 | ADR-0001 picks Option B (.NET) but MAF 1.0 has API churn before Q1 2026 GA fully stabilizes | Medium | Medium | MAF reached GA April 3, 2026 with locked API surface; pin to 1.x LTS; keep agent-orchestration interfaces abstracted so LangGraph (Option A) remains a drop-in fallback. |
+| R12 | Mojo kernel-only spike (ADR-0002) leaks into a wider scope via dependency on Modular MAX proprietary runtime | Low | Medium | Contain to one kernel in T4; require Apache-2.0 stdlib path only; revisit at annual review post fall-2026 open-source release. |
 
 ---
 
